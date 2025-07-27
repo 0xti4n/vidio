@@ -22,64 +22,93 @@ pub enum FileType {
 pub struct StorageService;
 
 impl StorageService {
+    fn ensure_directories() -> Result<()> {
+        fs::create_dir_all("transcripts")?;
+        fs::create_dir_all("reports")?;
+        Ok(())
+    }
+
     pub fn save_transcript(transcript: &FetchedTranscript) -> Result<PathBuf> {
+        Self::ensure_directories()?;
+
         let file_name = format!("transcript_{}.txt", transcript.video_id);
-        let path = PathBuf::from(&file_name);
+        let path = PathBuf::from("transcripts").join(&file_name);
 
         fs::write(&path, transcript.text())?;
-        println!("Transcript saved to: {file_name}");
+        println!("Transcript saved to: {}", path.display());
 
         Ok(path)
     }
 
     pub fn save_report(video_id: &str, content: &str) -> Result<PathBuf> {
+        Self::ensure_directories()?;
+
         let file_name = format!("report_{video_id}.md");
-        let path = PathBuf::from(&file_name);
+        let path = PathBuf::from("reports").join(&file_name);
 
         fs::write(&path, content)?;
-        println!("Report saved to: {file_name}");
+        println!("Report saved to: {}", path.display());
 
         Ok(path)
     }
 
     pub fn load_transcript(video_id: &str) -> Result<String> {
         let file_name = format!("transcript_{video_id}.txt");
-        let content = fs::read_to_string(file_name)?;
+        let path = PathBuf::from("transcripts").join(&file_name);
+        let content = fs::read_to_string(path)?;
         Ok(content)
     }
 
     #[allow(dead_code)]
     pub fn load_report(video_id: &str) -> Result<String> {
         let file_name = format!("report_{video_id}.md");
-        let content = fs::read_to_string(file_name)?;
+        let path = PathBuf::from("reports").join(&file_name);
+        let content = fs::read_to_string(path)?;
         Ok(content)
     }
 
     pub fn list_files() -> Result<Vec<FileEntry>> {
+        Self::ensure_directories()?;
         let mut files = Vec::new();
 
-        for entry in fs::read_dir(".")? {
-            let entry = entry?;
-            let path = entry.path();
+        // Check transcripts folder
+        if let Ok(entries) = fs::read_dir("transcripts") {
+            for entry in entries {
+                let entry = entry?;
+                let path = entry.path();
 
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                let file_type = if name.starts_with("transcript_") && name.ends_with(".txt") {
-                    Some(FileType::Transcript)
-                } else if name.starts_with("report_") && name.ends_with(".md") {
-                    Some(FileType::Report)
-                } else {
-                    None
-                };
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.starts_with("transcript_") && name.ends_with(".txt") {
+                        let metadata = entry.metadata()?;
+                        files.push(FileEntry {
+                            path: path.clone(),
+                            name: name.to_string(),
+                            file_type: FileType::Transcript,
+                            size: metadata.len(),
+                            modified: metadata.modified()?,
+                        });
+                    }
+                }
+            }
+        }
 
-                if let Some(file_type) = file_type {
-                    let metadata = entry.metadata()?;
-                    files.push(FileEntry {
-                        path: path.clone(),
-                        name: name.to_string(),
-                        file_type,
-                        size: metadata.len(),
-                        modified: metadata.modified()?,
-                    });
+        // Check reports folder
+        if let Ok(entries) = fs::read_dir("reports") {
+            for entry in entries {
+                let entry = entry?;
+                let path = entry.path();
+
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if name.starts_with("report_") && name.ends_with(".md") {
+                        let metadata = entry.metadata()?;
+                        files.push(FileEntry {
+                            path: path.clone(),
+                            name: name.to_string(),
+                            file_type: FileType::Report,
+                            size: metadata.len(),
+                            modified: metadata.modified()?,
+                        });
+                    }
                 }
             }
         }
