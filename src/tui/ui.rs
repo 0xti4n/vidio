@@ -262,7 +262,7 @@ fn draw_viewer(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     // Content viewer
-    if let Some(viewer) = &app.content_viewer {
+    if let Some(viewer) = &mut app.content_viewer {
         app.viewer_height = chunks[0].height;
         viewer.render(f, chunks[0]);
     }

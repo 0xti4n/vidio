@@ -14,6 +14,8 @@ pub struct Viewer {
     pub content: String,
     pub title: String,
     pub scroll: usize,
+    wrapped_lines: Vec<String>,
+    last_known_width: u16,
 }
 
 impl Viewer {
@@ -22,12 +24,14 @@ impl Viewer {
             content,
             title,
             scroll: 0,
+            wrapped_lines: Vec::new(),
+            last_known_width: 0,
         }
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, area_height: u16) {
         let area_height = area_height as usize;
-        let lines = self.content.lines().count();
+        let lines = self.wrapped_lines.len();
         let page_size = area_height.saturating_sub(2);
 
         match key.code {
@@ -37,12 +41,12 @@ impl Viewer {
                 }
             }
             KeyCode::Down => {
-                if self.scroll < lines.saturating_sub(area_height.saturating_sub(2)) {
+                if self.scroll < lines.saturating_sub(page_size) {
                     self.scroll += 1;
                 }
             }
             KeyCode::PageUp => {
-                self.scroll = self.scroll.saturating_sub(area_height.saturating_sub(2));
+                self.scroll = self.scroll.saturating_sub(page_size);
             }
             KeyCode::PageDown => {
                 self.scroll = (self.scroll + page_size).min(lines.saturating_sub(page_size));
@@ -57,7 +61,15 @@ impl Viewer {
         }
     }
 
-    pub fn render(&self, f: &mut Frame, area: Rect) {
+    pub fn render(&mut self, f: &mut Frame, area: Rect) {
+        let view_width = area.width.saturating_sub(2) as usize;
+
+        if area.width != self.last_known_width {
+            let decoded_content = decode_html_entities(&self.content);
+            let wrapped_text = wrap(&decoded_content, view_width);
+            self.wrapped_lines = wrapped_text.into_iter().map(|s| s.to_string()).collect();
+            self.last_known_width = area.width;
+        }
         let title = format!(
             "Viewer: {}",
             std::path::Path::new(&self.title)
@@ -66,10 +78,8 @@ impl Viewer {
                 .to_string_lossy()
         );
 
-        let decoded_content = decode_html_entities(&self.content);
-        let wrapped_text = wrap(&decoded_content, area.width as usize);
-
-        let lines: Vec<Line> = wrapped_text
+        let lines: Vec<Line> = self
+            .wrapped_lines
             .iter()
             .skip(self.scroll)
             .take(area.height.saturating_sub(2) as usize)
@@ -91,7 +101,7 @@ impl Viewer {
             })
             .collect();
 
-        let total_lines = self.content.lines().count();
+        let total_lines = self.wrapped_lines.len();
         let visible_lines = area.height.saturating_sub(2) as usize;
         let scroll_info = if total_lines > visible_lines {
             format!(
@@ -120,5 +130,7 @@ impl Viewer {
         self.content = content;
         self.title = file_path;
         self.scroll = 0;
+        self.wrapped_lines = Vec::new();
+        self.last_known_width = 0;
     }
 }
