@@ -63,7 +63,7 @@ impl ContentViewer {
 
     pub fn render(&self, f: &mut Frame, area: Rect) {
         let title = format!(
-            "Visor: {}",
+            "Viewer: {}",
             std::path::Path::new(&self.file_path)
                 .file_name()
                 .unwrap_or_default()
