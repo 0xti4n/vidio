@@ -1,6 +1,6 @@
 use crate::core::{FileType, ReportService, StorageService, TranscriptService, storage::FileEntry};
 use crate::error::Result;
-use crate::tui::components::{ContentViewer, FileList, InputField, ProgressBar};
+use crate::tui::components::{FileList, InputField, ProgressBar, Viewer};
 use crate::tui::events::AppEvent;
 use crossterm::event::{KeyCode, KeyEvent};
 use serde::{Deserialize, Serialize};
@@ -62,7 +62,8 @@ pub struct App {
     pub filter: FileFilter,
 
     // Viewer screen
-    pub content_viewer: Option<ContentViewer>,
+    pub content_viewer: Option<Viewer>,
+    pub viewer_height: u16,
 
     // Processing screen
     pub progress_bar: ProgressBar,
@@ -99,6 +100,7 @@ impl App {
             filter: FileFilter::All,
 
             content_viewer: None,
+            viewer_height: 0,
             progress_bar: ProgressBar::new(),
 
             transcript_service,
@@ -273,7 +275,7 @@ impl App {
             }
             _ => {
                 if let Some(viewer) = &mut self.content_viewer {
-                    viewer.handle_key(key, 20); // Approximate height
+                    viewer.handle_key(key, self.viewer_height); // Approximate height
                 }
             }
         }
@@ -525,7 +527,7 @@ impl App {
 
     fn open_file(&mut self, file: FileEntry) -> Result<()> {
         let content = std::fs::read_to_string(&file.path)?;
-        let viewer = ContentViewer::new(content, file.path.to_string_lossy().to_string());
+        let viewer = Viewer::new(content, file.path.to_string_lossy().to_string());
         self.content_viewer = Some(viewer);
         self.state = AppState::Viewer {
             file_path: file.path,

@@ -141,14 +141,14 @@ async fn run_tui() -> Result<()> {
 
     // Main event loop
     loop {
+        // Handle events
+        let event = event_handler.next_event()?;
+        app.handle_event(event)?;
+
         // Draw UI
         terminal.draw(|f| {
             ui::draw(f, &mut app);
         })?;
-
-        // Handle events
-        let event = event_handler.next_event()?;
-        app.handle_event(event)?;
 
         // Check if we should quit
         if app.should_quit {

@@ -255,7 +255,7 @@ fn draw_browser(f: &mut Frame, app: &mut App) {
     f.render_widget(help, right_chunks[1]);
 }
 
-fn draw_viewer(f: &mut Frame, app: &App) {
+fn draw_viewer(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(1), Constraint::Length(3)])
@@ -263,6 +263,7 @@ fn draw_viewer(f: &mut Frame, app: &App) {
 
     // Content viewer
     if let Some(viewer) = &app.content_viewer {
+        app.viewer_height = chunks[0].height;
         viewer.render(f, chunks[0]);
     }
 

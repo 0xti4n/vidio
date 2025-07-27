@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
+use html_escape::decode_html_entities;
 use ratatui::{
     Frame,
     layout::Rect,
@@ -6,88 +7,86 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
+use textwrap::wrap;
 
-pub struct ContentViewer {
+#[derive(Debug, Clone, Default)]
+pub struct Viewer {
     pub content: String,
+    pub title: String,
     pub scroll: usize,
-    pub file_path: String,
 }
 
-impl ContentViewer {
-    pub fn new(content: String, file_path: String) -> Self {
+impl Viewer {
+    pub fn new(content: String, title: String) -> Self {
         Self {
             content,
+            title,
             scroll: 0,
-            file_path,
         }
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent, area_height: usize) -> bool {
+    pub fn handle_key(&mut self, key: KeyEvent, area_height: u16) {
+        let area_height = area_height as usize;
+        let lines = self.content.lines().count();
+        let page_size = area_height.saturating_sub(2);
+
         match key.code {
             KeyCode::Up => {
                 if self.scroll > 0 {
                     self.scroll -= 1;
                 }
-                true
             }
             KeyCode::Down => {
-                let lines = self.content.lines().count();
                 if self.scroll < lines.saturating_sub(area_height.saturating_sub(2)) {
                     self.scroll += 1;
                 }
-                true
             }
             KeyCode::PageUp => {
                 self.scroll = self.scroll.saturating_sub(area_height.saturating_sub(2));
-                true
             }
             KeyCode::PageDown => {
-                let lines = self.content.lines().count();
-                let page_size = area_height.saturating_sub(2);
                 self.scroll = (self.scroll + page_size).min(lines.saturating_sub(page_size));
-                true
             }
             KeyCode::Home => {
                 self.scroll = 0;
-                true
             }
             KeyCode::End => {
-                let lines = self.content.lines().count();
-                let page_size = area_height.saturating_sub(2);
                 self.scroll = lines.saturating_sub(page_size);
-                true
             }
-            _ => false,
+            _ => {}
         }
     }
 
     pub fn render(&self, f: &mut Frame, area: Rect) {
         let title = format!(
             "Viewer: {}",
-            std::path::Path::new(&self.file_path)
+            std::path::Path::new(&self.title)
                 .file_name()
                 .unwrap_or_default()
                 .to_string_lossy()
         );
 
-        let lines: Vec<Line> = self
-            .content
-            .lines()
+        let decoded_content = decode_html_entities(&self.content);
+        let wrapped_text = wrap(&decoded_content, area.width as usize);
+
+        let lines: Vec<Line> = wrapped_text
+            .iter()
             .skip(self.scroll)
             .take(area.height.saturating_sub(2) as usize)
             .map(|line| {
-                if line.starts_with('#') {
+                let line_str = line.to_string();
+                if line_str.starts_with('#') {
                     // Markdown headers
-                    Line::from(Span::styled(line, Style::default().fg(Color::Yellow)))
-                } else if line.starts_with('|') && line.ends_with('|') {
+                    Line::from(Span::styled(line_str, Style::default().fg(Color::Yellow)))
+                } else if line_str.starts_with('|') && line_str.ends_with('|') {
                     // Table rows
-                    Line::from(Span::styled(line, Style::default().fg(Color::Cyan)))
-                } else if line.starts_with('-') || line.starts_with('*') {
+                    Line::from(Span::styled(line_str, Style::default().fg(Color::Cyan)))
+                } else if line_str.starts_with('-') || line_str.starts_with('*') {
                     // List items
-                    Line::from(Span::styled(line, Style::default().fg(Color::Green)))
+                    Line::from(Span::styled(line_str, Style::default().fg(Color::Green)))
                 } else {
                     // Regular text
-                    Line::from(Span::raw(line))
+                    Line::from(Span::raw(line_str))
                 }
             })
             .collect();
@@ -119,7 +118,7 @@ impl ContentViewer {
     #[allow(dead_code)]
     pub fn set_content(&mut self, content: String, file_path: String) {
         self.content = content;
-        self.file_path = file_path;
+        self.title = file_path;
         self.scroll = 0;
     }
 }
