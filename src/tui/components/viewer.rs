@@ -96,7 +96,7 @@ impl ContentViewer {
         let visible_lines = area.height.saturating_sub(2) as usize;
         let scroll_info = if total_lines > visible_lines {
             format!(
-                " (Línea {}-{} de {})",
+                " (Line {}-{} of {})",
                 self.scroll + 1,
                 (self.scroll + visible_lines).min(total_lines),
                 total_lines

@@ -88,14 +88,14 @@ impl App {
 
             selected_option: 0,
 
-            url_input: InputField::new("URL del Video", "https://youtu.be/..."),
-            languages_input: InputField::new("Idiomas", "en,es"),
+            url_input: InputField::new("Video URL", "https://youtu.be/..."),
+            languages_input: InputField::new("Languages", "en,es"),
             preserve_formatting: true,
             generate_report: true,
             input_focus: 0,
 
             file_list: FileList::new(files),
-            search_input: InputField::new("Búsqueda", "Filtrar archivos..."),
+            search_input: InputField::new("Search", "Filter files..."),
             filter: FileFilter::All,
 
             content_viewer: None,
@@ -359,12 +359,12 @@ impl App {
             self.state = AppState::Processing {
                 video_id: video_id.clone(),
                 progress: 0.0,
-                status: "Iniciando...".to_string(),
+                status: "Starting...".to_string(),
                 logs: Vec::new(),
             };
 
             self.progress_bar.reset();
-            self.progress_bar.set_message("Iniciando...".to_string());
+            self.progress_bar.set_message("Starting...".to_string());
 
             // Start real async processing
             if let Some(tx) = &self.processing_tx {
@@ -386,7 +386,7 @@ impl App {
         let report_service = self.report_service.clone();
 
         tokio::spawn(async move {
-            let _ = tx.send("STATUS:Iniciando procesamiento...".to_string());
+            let _ = tx.send("STATUS:Starting processing...".to_string());
             let _ = tx.send("PROGRESS:0.1".to_string());
             let _ = tx.send("LOG:Extracting video ID...".to_string());
 
@@ -394,7 +394,7 @@ impl App {
             let languages: Vec<&str> = request.languages.iter().map(|s| s.as_str()).collect();
 
             // Fetch transcript
-            let _ = tx.send("STATUS:Descargando transcripción...".to_string());
+            let _ = tx.send("STATUS:Downloading transcript...".to_string());
             let _ = tx.send("PROGRESS:0.25".to_string());
             let _ = tx.send("LOG:Fetching transcript...".to_string());
 
@@ -415,7 +415,7 @@ impl App {
 
                             // Generate report if requested
                             if request.generate_report {
-                                let _ = tx.send("STATUS:Generando reporte...".to_string());
+                                let _ = tx.send("STATUS:Generating report...".to_string());
                                 let _ = tx.send("PROGRESS:0.7".to_string());
                                 let _ = tx.send("LOG:Generating report...".to_string());
 
@@ -435,15 +435,14 @@ impl App {
                                                 let _ = tx.send(
                                                     "LOG:Report saved successfully!".to_string(),
                                                 );
-                                                let _ = tx.send("STATUS:Completado".to_string());
+                                                let _ = tx.send("STATUS:Completed".to_string());
                                                 let _ = tx.send("COMPLETE".to_string());
                                             }
                                             Err(e) => {
                                                 let _ = tx
                                                     .send(format!("LOG:Error saving report: {e}"));
-                                                let _ = tx.send(
-                                                    "STATUS:Error al guardar reporte".to_string(),
-                                                );
+                                                let _ = tx
+                                                    .send("STATUS:Error saving report".to_string());
                                                 let _ = tx.send("COMPLETE".to_string());
                                             }
                                         }
@@ -452,26 +451,26 @@ impl App {
                                         let _ =
                                             tx.send(format!("LOG:Error generating report: {e}"));
                                         let _ =
-                                            tx.send("STATUS:Error al generar reporte".to_string());
+                                            tx.send("STATUS:Error generating report".to_string());
                                         let _ = tx.send("COMPLETE".to_string());
                                     }
                                 }
                             } else {
                                 let _ = tx.send("PROGRESS:1.0".to_string());
-                                let _ = tx.send("STATUS:Completado".to_string());
+                                let _ = tx.send("STATUS:Completed".to_string());
                                 let _ = tx.send("COMPLETE".to_string());
                             }
                         }
                         Err(e) => {
                             let _ = tx.send(format!("LOG:Error saving transcript: {e}"));
-                            let _ = tx.send("STATUS:Error al guardar transcripción".to_string());
+                            let _ = tx.send("STATUS:Error saving transcript".to_string());
                             let _ = tx.send("COMPLETE".to_string());
                         }
                     }
                 }
                 Err(e) => {
                     let _ = tx.send(format!("LOG:Error fetching transcript: {e}"));
-                    let _ = tx.send("STATUS:Error al descargar transcripción".to_string());
+                    let _ = tx.send("STATUS:Error downloading transcript".to_string());
                     let _ = tx.send("COMPLETE".to_string());
                 }
             }

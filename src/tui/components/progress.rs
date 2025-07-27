@@ -61,13 +61,13 @@ impl ProgressBar {
         // Progress bar
         let progress_percent = (self.progress * 100.0) as u16;
         let gauge = Gauge::default()
-            .block(Block::default().borders(Borders::ALL).title("Progreso"))
+            .block(Block::default().borders(Borders::ALL).title("Progress"))
             .gauge_style(Style::default().fg(Color::Green))
             .percent(progress_percent);
         f.render_widget(gauge, chunks[1]);
 
         // Status message
-        let status_paragraph = Paragraph::new(format!("Estado: {}", self.message))
+        let status_paragraph = Paragraph::new(format!("Status: {}", self.message))
             .style(Style::default().fg(Color::Yellow));
         f.render_widget(status_paragraph, chunks[2]);
 

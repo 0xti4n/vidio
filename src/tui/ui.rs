@@ -41,10 +41,10 @@ fn draw_home(f: &mut Frame, app: &App) {
 
     // Menu options
     let options = [
-        "● Nueva Transcripción",
-        "○ Ver Transcripciones",
-        "○ Ver Reportes",
-        "○ Configuración",
+        "● New Transcript",
+        "○ View Transcripts",
+        "○ View Reports",
+        "○ Settings",
     ];
 
     let menu_items: Vec<ListItem> = options
@@ -70,12 +70,12 @@ fn draw_home(f: &mut Frame, app: &App) {
         .collect();
 
     let menu = List::new(menu_items)
-        .block(Block::default().borders(Borders::ALL).title("Modo"))
+        .block(Block::default().borders(Borders::ALL).title("Mode"))
         .style(Style::default().fg(Color::White));
     f.render_widget(menu, chunks[1]);
 
     // Help
-    let help = Paragraph::new("[↑↓] Navegar  [Enter] Seleccionar  [q] Salir")
+    let help = Paragraph::new("[↑↓] Navigate  [Enter] Select  [q] Exit")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
@@ -95,7 +95,7 @@ fn draw_new_transcript(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     // Title
-    let title = Paragraph::new("Nueva Transcripción")
+    let title = Paragraph::new("New Transcript")
         .style(
             Style::default()
                 .fg(Color::Yellow)
@@ -112,7 +112,7 @@ fn draw_new_transcript(f: &mut Frame, app: &mut App) {
     app.languages_input.render(f, chunks[2]);
 
     // Checkboxes
-    let checkbox_block = Block::default().borders(Borders::ALL).title("Opciones");
+    let checkbox_block = Block::default().borders(Borders::ALL).title("Options");
     f.render_widget(checkbox_block, chunks[3]);
 
     let checkbox_area = Layout::default()
@@ -141,15 +141,15 @@ fn draw_new_transcript(f: &mut Frame, app: &mut App) {
     let report_checkbox = if app.generate_report { "☑" } else { "☐" };
 
     let preserve_text =
-        Paragraph::new(format!("{preserve_checkbox} Preservar formato")).style(preserve_style);
+        Paragraph::new(format!("{preserve_checkbox} Preserve formatting")).style(preserve_style);
     f.render_widget(preserve_text, checkbox_area[0]);
 
-    let report_text = Paragraph::new(format!("{report_checkbox} Generar reporte automáticamente"))
+    let report_text = Paragraph::new(format!("{report_checkbox} Generate report automatically"))
         .style(report_style);
     f.render_widget(report_text, checkbox_area[1]);
 
     // Help
-    let help = Paragraph::new("[Enter] Procesar  [Esc] Volver  [Tab] Siguiente  [Space] Toggle")
+    let help = Paragraph::new("[Enter] Process  [Esc] Back  [Tab] Next  [Space] Toggle")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
@@ -167,7 +167,7 @@ fn draw_processing(f: &mut Frame, app: &App, video_id: &str) {
         .split(f.area());
 
     // Title
-    let title = Paragraph::new("Procesando...")
+    let title = Paragraph::new("Processing...")
         .style(
             Style::default()
                 .fg(Color::Yellow)
@@ -181,7 +181,7 @@ fn draw_processing(f: &mut Frame, app: &App, video_id: &str) {
     app.progress_bar.render(f, chunks[1], video_id);
 
     // Help
-    let help = Paragraph::new("[Esc] Cancelar")
+    let help = Paragraph::new("[Esc] Cancel")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
@@ -203,7 +203,7 @@ fn draw_browser(f: &mut Frame, app: &mut App) {
         .split(chunks[0]);
 
     // Filter panel
-    let filter_options = ["● Todos", "○ Transcripciones", "○ Reportes"];
+    let filter_options = ["● All", "○ Transcripts", "○ Reports"];
     let filter_items: Vec<ListItem> = filter_options
         .iter()
         .enumerate()
@@ -232,7 +232,7 @@ fn draw_browser(f: &mut Frame, app: &mut App) {
         .collect();
 
     let filters =
-        List::new(filter_items).block(Block::default().borders(Borders::ALL).title("Filtros"));
+        List::new(filter_items).block(Block::default().borders(Borders::ALL).title("Filters"));
     f.render_widget(filters, left_chunks[0]);
 
     // Search
@@ -244,15 +244,14 @@ fn draw_browser(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Min(1), Constraint::Length(3)])
         .split(chunks[1]);
 
-    app.file_list.render(f, right_chunks[0], "Archivos");
+    app.file_list.render(f, right_chunks[0], "Files");
 
     // Help
-    let help = Paragraph::new(
-        "[Enter] Abrir  [Del] Eliminar  [Space] Seleccionar  [/] Buscar  [1-3] Filtros",
-    )
-    .style(Style::default().fg(Color::Gray))
-    .alignment(Alignment::Center)
-    .block(Block::default().borders(Borders::ALL));
+    let help =
+        Paragraph::new("[Enter] Open  [Del] Delete  [Space] Select  [/] Search  [1-3] Filters")
+            .style(Style::default().fg(Color::Gray))
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL));
     f.render_widget(help, right_chunks[1]);
 }
 
@@ -268,11 +267,10 @@ fn draw_viewer(f: &mut Frame, app: &App) {
     }
 
     // Help
-    let help =
-        Paragraph::new("[↑↓] Scroll  [PgUp/PgDn] Página  [Home/End] Inicio/Fin  [Esc] Volver")
-            .style(Style::default().fg(Color::Gray))
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::ALL));
+    let help = Paragraph::new("[↑↓] Scroll  [PgUp/PgDn] Page  [Home/End] Home/End  [Esc] Back")
+        .style(Style::default().fg(Color::Gray))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
     f.render_widget(help, chunks[1]);
 }
 
@@ -287,7 +285,7 @@ fn draw_settings(f: &mut Frame, _app: &App) {
         .split(f.area());
 
     // Title
-    let title = Paragraph::new("Configuración")
+    let title = Paragraph::new("Settings")
         .style(
             Style::default()
                 .fg(Color::Yellow)
@@ -298,14 +296,14 @@ fn draw_settings(f: &mut Frame, _app: &App) {
     f.render_widget(title, chunks[0]);
 
     // Settings content (placeholder)
-    let settings_content = Paragraph::new("Configuraciones próximamente...")
+    let settings_content = Paragraph::new("Settings coming soon...")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
     f.render_widget(settings_content, chunks[1]);
 
     // Help
-    let help = Paragraph::new("[Esc] Volver")
+    let help = Paragraph::new("[Esc] Back")
         .style(Style::default().fg(Color::Gray))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
