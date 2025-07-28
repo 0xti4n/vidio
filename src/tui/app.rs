@@ -2,7 +2,7 @@ use crate::core::{FileType, ReportService, StorageService, TranscriptService, st
 use crate::error::Result;
 use crate::tui::components::{FileList, InputField, ProgressBar, Viewer};
 use crate::tui::events::AppEvent;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
@@ -140,6 +140,9 @@ impl App {
 
     fn handle_home_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
+            KeyCode::Char('q') => {
+                self.should_quit = true;
+            }
             KeyCode::Up => {
                 if self.selected_option > 0 {
                     self.selected_option -= 1;
@@ -188,6 +191,9 @@ impl App {
 
     fn handle_new_transcript_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.should_quit = true;
+            }
             KeyCode::Esc => {
                 self.state = AppState::Home;
             }
@@ -220,7 +226,7 @@ impl App {
 
     fn handle_browser_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
-            KeyCode::Esc => {
+            KeyCode::Esc | KeyCode::Char('q') => {
                 self.state = AppState::Home;
             }
             KeyCode::Enter => {
@@ -267,7 +273,7 @@ impl App {
 
     fn handle_viewer_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
-            KeyCode::Esc => {
+            KeyCode::Esc | KeyCode::Char('q') => {
                 self.state = AppState::Browser {
                     filter: self.filter.clone(),
                     search: String::new(),
@@ -283,7 +289,7 @@ impl App {
     }
 
     fn handle_processing_key(&mut self, key: KeyEvent) -> Result<()> {
-        if key.code == KeyCode::Esc {
+        if key.code == KeyCode::Esc || key.code == KeyCode::Char('q') {
             // Cancel processing
             self.state = AppState::NewTranscript;
             self.progress_bar.reset();
@@ -292,7 +298,7 @@ impl App {
     }
 
     fn handle_settings_key(&mut self, key: KeyEvent) -> Result<()> {
-        if key.code == KeyCode::Esc {
+        if key.code == KeyCode::Esc || key.code == KeyCode::Char('q') {
             self.state = AppState::Home;
         }
         Ok(())
