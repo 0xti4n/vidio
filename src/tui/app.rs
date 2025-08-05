@@ -563,7 +563,7 @@ impl App {
         for file in selected_files {
             StorageService::delete_file(&file.path)?;
         }
-        self.refresh_file_list()?;
+        self.apply_filter();
         Ok(())
     }
 }
