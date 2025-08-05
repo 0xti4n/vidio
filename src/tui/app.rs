@@ -166,7 +166,6 @@ impl App {
                     self.input_focus = 0;
                 }
                 1 => {
-                    self.refresh_file_list()?;
                     // Reset search input when entering Browser
                     self.search_input.clear();
                     self.search_input.focused = false;
@@ -178,7 +177,6 @@ impl App {
                     };
                 }
                 2 => {
-                    self.refresh_file_list()?;
                     // Reset search input when entering Browser
                     self.search_input.clear();
                     self.search_input.focused = false;
