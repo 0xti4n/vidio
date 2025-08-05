@@ -1,20 +1,22 @@
 use crossterm::event::{KeyCode, KeyEvent};
 use html_escape::decode_html_entities;
+use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Color, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 use textwrap::wrap;
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug, Clone, Default)]
 pub struct Viewer {
     pub content: String,
     pub title: String,
     pub scroll: usize,
-    wrapped_lines: Vec<String>,
+    wrapped_lines: Vec<Line<'static>>, // parsed and wrapped lines for current width
     last_known_width: u16,
 }
 
@@ -64,12 +66,18 @@ impl Viewer {
     pub fn render(&mut self, f: &mut Frame, area: Rect) {
         let view_width = area.width.saturating_sub(2) as usize;
 
-        if area.width != self.last_known_width {
-            let decoded_content = decode_html_entities(&self.content);
-            let wrapped_text = wrap(&decoded_content, view_width);
-            self.wrapped_lines = wrapped_text.into_iter().map(|s| s.to_string()).collect();
+        if area.width != self.last_known_width || self.wrapped_lines.is_empty() {
+            let decoded_content = decode_html_entities(&self.content).to_string();
+            self.wrapped_lines = parse_markdown_to_lines(&decoded_content, view_width);
             self.last_known_width = area.width;
+            // clamp scroll if width change reduced content height
+            let visible = area.height.saturating_sub(2) as usize;
+            let max_scroll = self.wrapped_lines.len().saturating_sub(visible);
+            if self.scroll > max_scroll {
+                self.scroll = max_scroll;
+            }
         }
+
         let title = format!(
             "Viewer: {}",
             std::path::Path::new(&self.title)
@@ -77,29 +85,6 @@ impl Viewer {
                 .unwrap_or_default()
                 .to_string_lossy()
         );
-
-        let lines: Vec<Line> = self
-            .wrapped_lines
-            .iter()
-            .skip(self.scroll)
-            .take(area.height.saturating_sub(2) as usize)
-            .map(|line| {
-                let line_str = line.to_string();
-                if line_str.starts_with('#') {
-                    // Markdown headers
-                    Line::from(Span::styled(line_str, Style::default().fg(Color::Yellow)))
-                } else if line_str.starts_with('|') && line_str.ends_with('|') {
-                    // Table rows
-                    Line::from(Span::styled(line_str, Style::default().fg(Color::Cyan)))
-                } else if line_str.starts_with('-') || line_str.starts_with('*') {
-                    // List items
-                    Line::from(Span::styled(line_str, Style::default().fg(Color::Green)))
-                } else {
-                    // Regular text
-                    Line::from(Span::raw(line_str))
-                }
-            })
-            .collect();
 
         let total_lines = self.wrapped_lines.len();
         let visible_lines = area.height.saturating_sub(2) as usize;
@@ -118,7 +103,16 @@ impl Viewer {
             .borders(Borders::ALL)
             .title(format!("{title}{scroll_info}"));
 
-        let paragraph = Paragraph::new(lines)
+        // Slice the lines for current viewport
+        let slice: Vec<Line> = self
+            .wrapped_lines
+            .iter()
+            .skip(self.scroll)
+            .take(visible_lines)
+            .cloned()
+            .collect();
+
+        let paragraph = Paragraph::new(slice)
             .block(block)
             .wrap(Wrap { trim: false });
 
@@ -133,4 +127,370 @@ impl Viewer {
         self.wrapped_lines = Vec::new();
         self.last_known_width = 0;
     }
+}
+
+fn parse_markdown_to_lines(src: &str, width: usize) -> Vec<Line<'static>> {
+    let mut opts = Options::empty();
+    opts.insert(Options::ENABLE_FOOTNOTES);
+    opts.insert(Options::ENABLE_TABLES);
+    opts.insert(Options::ENABLE_TASKLISTS);
+    opts.insert(Options::ENABLE_STRIKETHROUGH);
+
+    let parser = Parser::new_ext(src, opts);
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    let mut current = String::new();
+    let mut mods_stack: Vec<Modifier> = Vec::new();
+    // let mut in_code_block = false;
+    let mut header_level: Option<u32> = None;
+
+    // Table accumulation state
+    let mut in_table = false;
+    let mut table_headers: Vec<String> = Vec::new();
+    let mut table_rows: Vec<Vec<String>> = Vec::new();
+    let mut current_row: Vec<String> = Vec::new();
+    let mut in_table_head = false;
+
+    let push_current =
+        |lines: &mut Vec<Line<'static>>, current: &mut String, mods: &[Modifier], width: usize| {
+            if current.is_empty() {
+                return;
+            }
+            let style = style_from_mods(mods);
+            for wrapped in wrap(current.trim_end(), width) {
+                lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+            }
+            *current = String::new();
+        };
+
+    for ev in parser {
+        match ev {
+            Event::Start(tag) => match tag {
+                Tag::Heading { level, .. } => {
+                    header_level = Some(level as u32);
+                    mods_stack.push(Modifier::BOLD);
+                }
+                Tag::Emphasis => mods_stack.push(Modifier::ITALIC),
+                Tag::Strong => mods_stack.push(Modifier::BOLD),
+                Tag::Strikethrough => mods_stack.push(Modifier::CROSSED_OUT),
+                Tag::CodeBlock(_) => {
+                    // in_code_block = true;
+                }
+                Tag::Item => {
+                    current.push_str("• ");
+                }
+                Tag::Link { .. } => {
+                    mods_stack.push(Modifier::UNDERLINED);
+                }
+                Tag::Table(_) => {
+                    // Flush any running paragraph
+                    push_current(&mut lines, &mut current, &mods_stack, width);
+                    in_table = true;
+                    table_headers.clear();
+                    table_rows.clear();
+                    current_row.clear();
+                    in_table_head = false;
+                }
+                Tag::TableHead => {
+                    in_table_head = true;
+                }
+                Tag::TableRow => {
+                    current_row.clear();
+                }
+                Tag::TableCell => { /* cells handled via Event::Text accumulation */ }
+                Tag::Paragraph | Tag::List(_) | Tag::BlockQuote(_) => { /* no-op */ }
+                _ => {}
+            },
+            Event::End(tag_end) => match tag_end {
+                TagEnd::Heading(_) => {
+                    let mut mods = mods_stack.clone();
+                    if let Some(level) = header_level {
+                        if level <= 2 {
+                            mods.push(Modifier::UNDERLINED);
+                        }
+                    }
+                    push_current(&mut lines, &mut current, &mods, width);
+                    lines.push(Line::from(""));
+                    header_level = None;
+                    if let Some(pos) = mods_stack.iter().rposition(|m| *m == Modifier::BOLD) {
+                        mods_stack.remove(pos);
+                    }
+                }
+                TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link => {
+                    mods_stack.pop();
+                }
+                TagEnd::CodeBlock => {
+                    // in_code_block = false;
+                    push_current(&mut lines, &mut current, &mods_stack, width);
+                    lines.push(Line::from(""));
+                }
+                TagEnd::Item => {
+                    push_current(&mut lines, &mut current, &mods_stack, width);
+                }
+                TagEnd::TableCell => {
+                    if in_table {
+                        // finish current cell
+                        current_row.push(std::mem::take(&mut current));
+                    }
+                }
+                TagEnd::TableRow => {
+                    if in_table {
+                        if in_table_head {
+                            table_headers = current_row.clone();
+                        } else {
+                            table_rows.push(current_row.clone());
+                        }
+                        current_row.clear();
+                    }
+                }
+                TagEnd::TableHead => {
+                    in_table_head = false;
+                }
+                TagEnd::Table => {
+                    if in_table {
+                        // Render table now
+                        let mut table_lines = render_table(&table_headers, &table_rows, width);
+                        lines.append(&mut table_lines);
+                        lines.push(Line::from("")); // blank line after table
+                        in_table = false;
+                    }
+                }
+                TagEnd::Paragraph | TagEnd::List(_) | TagEnd::BlockQuote(_) => {
+                    push_current(&mut lines, &mut current, &mods_stack, width);
+                    lines.push(Line::from(""));
+                }
+                _ => {}
+            },
+            Event::Text(t) => {
+                if in_table {
+                    // accumulate into current cell (allow multi-text events)
+                    current.push_str(&t);
+                } else {
+                    current.push_str(&t);
+                }
+            }
+            Event::Code(code) => {
+                push_current(&mut lines, &mut current, &mods_stack, width);
+                for wrapped in wrap(&code, width) {
+                    lines.push(Line::from(Span::styled(
+                        wrapped.to_string(),
+                        Style::default().add_modifier(Modifier::REVERSED),
+                    )));
+                }
+            }
+            Event::SoftBreak => current.push(' '),
+            Event::HardBreak => {
+                push_current(&mut lines, &mut current, &mods_stack, width);
+            }
+            _ => {}
+        }
+    }
+
+    if in_table {
+        // Close any unterminated table (robustness)
+        let mut table_lines = render_table(&table_headers, &table_rows, width);
+        lines.append(&mut table_lines);
+    }
+
+    if !current.is_empty() {
+        push_current(&mut lines, &mut current, &mods_stack, width);
+    }
+
+    lines
+}
+
+fn style_from_mods(mods: &[Modifier]) -> Style {
+    let mut style = Style::default();
+    for &m in mods {
+        style = style.add_modifier(m);
+    }
+    style
+}
+
+fn render_table(headers: &[String], rows: &[Vec<String>], max_width: usize) -> Vec<Line<'static>> {
+    // Determine column count
+    let cols = headers
+        .len()
+        .max(rows.iter().map(|r| r.len()).max().unwrap_or(0));
+    if cols == 0 {
+        return Vec::new();
+    }
+
+    // Prepare normalized data
+    let norm_headers: Vec<String> = (0..cols)
+        .map(|i| headers.get(i).cloned().unwrap_or_default())
+        .collect();
+    let norm_rows: Vec<Vec<String>> = rows
+        .iter()
+        .map(|r| {
+            (0..cols)
+                .map(|i| r.get(i).cloned().unwrap_or_default())
+                .collect()
+        })
+        .collect();
+
+    // Compute natural widths
+    let mut col_widths: Vec<usize> = vec![0; cols];
+    for (i, h) in norm_headers.iter().enumerate() {
+        col_widths[i] = col_widths[i].max(display_width(h));
+    }
+    for row in &norm_rows {
+        for (i, cell) in row.iter().enumerate() {
+            col_widths[i] = col_widths[i].max(display_width(cell));
+        }
+    }
+
+    // Account for borders/padding and shrink if needed
+    let content_w: usize = col_widths.iter().sum();
+    let paddings = 2 * cols;
+    let verticals = cols + 1;
+    let total_needed = content_w + paddings + verticals;
+    if total_needed > max_width {
+        let mut over = total_needed - max_width;
+        let mut idxs: Vec<usize> = (0..cols).collect();
+        idxs.sort_by_key(|&i| std::cmp::Reverse(col_widths[i]));
+        for &i in &idxs {
+            if over == 0 {
+                break;
+            }
+            let min_keep = 3;
+            if col_widths[i] > min_keep {
+                let reducible = col_widths[i] - min_keep;
+                let reduce = reducible.min(over);
+                col_widths[i] -= reduce;
+                over -= reduce;
+            }
+        }
+    }
+
+    // Helper to wrap row into multiple physical lines per the col_widths
+    let wrap_row = |cells: &[String]| -> Vec<Vec<String>> {
+        let mut wrapped_cols: Vec<Vec<String>> = Vec::with_capacity(cols);
+        let mut max_lines = 0;
+        for (i, &w) in col_widths.iter().enumerate() {
+            let w = w.max(1);
+            let cell_text = cells.get(i).cloned().unwrap_or_default();
+            let wr = wrap(&cell_text, w);
+            let segs: Vec<String> = wr.into_iter().map(|s| s.to_string()).collect();
+            max_lines = max_lines.max(segs.len().max(1));
+            wrapped_cols.push(segs);
+        }
+        let mut out: Vec<Vec<String>> = Vec::with_capacity(max_lines);
+        for line_idx in 0..max_lines {
+            let mut row_line: Vec<String> = Vec::with_capacity(cols);
+            for wrapped_col in wrapped_cols.iter().take(cols) {
+                let seg = wrapped_col.get(line_idx).cloned().unwrap_or_default();
+                row_line.push(seg);
+            }
+            out.push(row_line);
+        }
+        out
+    };
+
+    // Render borders
+    let mut out: Vec<Line<'static>> = Vec::new();
+    let top = draw_border('┌', '┬', '┐', '─', &col_widths);
+    let sep = draw_border('├', '┼', '┤', '─', &col_widths);
+    let bottom = draw_border('└', '┴', '┘', '─', &col_widths);
+
+    out.push(Line::from(top));
+
+    // Header (centered + bold)
+    if cols > 0 {
+        for phys in wrap_row(&norm_headers) {
+            out.push(render_row_styled(&phys, &col_widths, true));
+        }
+        out.push(Line::from(sep.clone()));
+    }
+
+    // Body rows
+    for row in &norm_rows {
+        for phys in wrap_row(row) {
+            out.push(render_row_styled(&phys, &col_widths, false));
+        }
+        out.push(Line::from(sep.clone()));
+    }
+
+    // Replace last separator with bottom border
+    if let Some(last) = out.last_mut() {
+        *last = Line::from(bottom);
+    }
+
+    out
+}
+
+fn draw_border(left: char, mid: char, right: char, horiz: char, col_widths: &[usize]) -> String {
+    let mut s = String::new();
+    s.push(left);
+    for (i, w) in col_widths.iter().enumerate() {
+        s.push_str(&horiz.to_string().repeat(w + 2)); // include padding
+        if i + 1 < col_widths.len() {
+            s.push(mid);
+        }
+    }
+    s.push(right);
+    s
+}
+
+// fn render_row(cells: &[String], col_widths: &[usize], _header: bool) -> String {
+//     let mut s = String::new();
+//     s.push('│');
+//     for (i, cell) in cells.iter().enumerate() {
+//         s.push(' ');
+//         let w = col_widths[i];
+//         let cell_w = display_width(cell);
+//         s.push_str(cell);
+//         if cell_w < w {
+//             s.push_str(&" ".repeat(w - cell_w));
+//         }
+//         s.push(' ');
+//         s.push('│');
+//     }
+//     s
+// }
+
+fn render_row_styled(cells: &[String], col_widths: &[usize], header: bool) -> Line<'static> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    spans.push(Span::raw("│"));
+    for (i, cell) in cells.iter().enumerate() {
+        let w = col_widths[i];
+        let content = if header {
+            center_text(cell, w)
+        } else {
+            pad_right(cell, w)
+        };
+        let mut styled = Span::raw(format!(" {content} "));
+        if header {
+            styled = Span::styled(
+                format!(" {content} "),
+                Style::default().add_modifier(Modifier::BOLD),
+            );
+        }
+        spans.push(styled);
+        spans.push(Span::raw("│"));
+    }
+    Line::from(spans)
+}
+
+fn center_text(s: &str, width: usize) -> String {
+    let w = display_width(s);
+    if w >= width {
+        return s.to_string();
+    }
+    let total = width - w;
+    let left = total / 2;
+    let right = total - left;
+    format!("{}{}{}", " ".repeat(left), s, " ".repeat(right))
+}
+
+fn pad_right(s: &str, width: usize) -> String {
+    let w = display_width(s);
+    if w >= width {
+        return s.to_string();
+    }
+    format!("{}{}", s, " ".repeat(width - w))
+}
+
+fn display_width(s: &str) -> usize {
+    UnicodeWidthStr::width(s)
 }
