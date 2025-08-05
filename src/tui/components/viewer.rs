@@ -1,10 +1,11 @@
+// Colorized markdown viewer
 use crossterm::event::{KeyCode, KeyEvent};
 use html_escape::decode_html_entities;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
@@ -151,18 +152,6 @@ fn parse_markdown_to_lines(src: &str, width: usize) -> Vec<Line<'static>> {
     let mut current_row: Vec<String> = Vec::new();
     let mut in_table_head = false;
 
-    let push_current =
-        |lines: &mut Vec<Line<'static>>, current: &mut String, mods: &[Modifier], width: usize| {
-            if current.is_empty() {
-                return;
-            }
-            let style = style_from_mods(mods);
-            for wrapped in wrap(current.trim_end(), width) {
-                lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
-            }
-            *current = String::new();
-        };
-
     for ev in parser {
         match ev {
             Event::Start(tag) => match tag {
@@ -177,14 +166,24 @@ fn parse_markdown_to_lines(src: &str, width: usize) -> Vec<Line<'static>> {
                     // in_code_block = true;
                 }
                 Tag::Item => {
-                    current.push_str("• ");
+                    // prepend bullet to current buffer
+                    current.push_str("\u{2022} ");
                 }
                 Tag::Link { .. } => {
                     mods_stack.push(Modifier::UNDERLINED);
                 }
                 Tag::Table(_) => {
                     // Flush any running paragraph
-                    push_current(&mut lines, &mut current, &mods_stack, width);
+                    if !current.is_empty() {
+                        let mut style = style_from_mods(&mods_stack);
+                        if mods_stack.contains(&Modifier::BOLD) && header_level.is_some() {
+                            style = style.fg(Color::Cyan);
+                        }
+                        for wrapped in wrap(current.trim_end(), width) {
+                            lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+                        }
+                        current.clear();
+                    }
                     in_table = true;
                     table_headers.clear();
                     table_rows.clear();
@@ -209,7 +208,13 @@ fn parse_markdown_to_lines(src: &str, width: usize) -> Vec<Line<'static>> {
                             mods.push(Modifier::UNDERLINED);
                         }
                     }
-                    push_current(&mut lines, &mut current, &mods, width);
+                    let style = style_from_mods(&mods).fg(Color::Cyan);
+                    if !current.is_empty() {
+                        for wrapped in wrap(current.trim_end(), width) {
+                            lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+                        }
+                        current.clear();
+                    }
                     lines.push(Line::from(""));
                     header_level = None;
                     if let Some(pos) = mods_stack.iter().rposition(|m| *m == Modifier::BOLD) {
@@ -217,19 +222,31 @@ fn parse_markdown_to_lines(src: &str, width: usize) -> Vec<Line<'static>> {
                     }
                 }
                 TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link => {
+                    // flush current with existing mods (including link blue) before popping?
+                    // We keep behavior: just pop style marker
                     mods_stack.pop();
                 }
                 TagEnd::CodeBlock => {
-                    // in_code_block = false;
-                    push_current(&mut lines, &mut current, &mods_stack, width);
+                    if !current.is_empty() {
+                        let style = style_from_mods(&mods_stack);
+                        for wrapped in wrap(current.trim_end(), width) {
+                            lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+                        }
+                        current.clear();
+                    }
                     lines.push(Line::from(""));
                 }
                 TagEnd::Item => {
-                    push_current(&mut lines, &mut current, &mods_stack, width);
+                    if !current.is_empty() {
+                        let style = style_from_mods(&mods_stack);
+                        for wrapped in wrap(current.trim_end(), width) {
+                            lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+                        }
+                        current.clear();
+                    }
                 }
                 TagEnd::TableCell => {
                     if in_table {
-                        // finish current cell
                         current_row.push(std::mem::take(&mut current));
                     }
                 }
@@ -248,52 +265,69 @@ fn parse_markdown_to_lines(src: &str, width: usize) -> Vec<Line<'static>> {
                 }
                 TagEnd::Table => {
                     if in_table {
-                        // Render table now
                         let mut table_lines = render_table(&table_headers, &table_rows, width);
                         lines.append(&mut table_lines);
-                        lines.push(Line::from("")); // blank line after table
+                        lines.push(Line::from(""));
                         in_table = false;
                     }
                 }
                 TagEnd::Paragraph | TagEnd::List(_) | TagEnd::BlockQuote(_) => {
-                    push_current(&mut lines, &mut current, &mods_stack, width);
+                    if !current.is_empty() {
+                        let style = style_from_mods(&mods_stack);
+                        for wrapped in wrap(current.trim_end(), width) {
+                            lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+                        }
+                        current.clear();
+                    }
                     lines.push(Line::from(""));
                 }
                 _ => {}
             },
             Event::Text(t) => {
-                if in_table {
-                    // accumulate into current cell (allow multi-text events)
-                    current.push_str(&t);
-                } else {
-                    current.push_str(&t);
-                }
+                current.push_str(&t);
             }
             Event::Code(code) => {
-                push_current(&mut lines, &mut current, &mods_stack, width);
+                // inline code: yellow + reversed
+                if !current.is_empty() {
+                    let style = style_from_mods(&mods_stack);
+                    for wrapped in wrap(current.trim_end(), width) {
+                        lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+                    }
+                    current.clear();
+                }
                 for wrapped in wrap(&code, width) {
                     lines.push(Line::from(Span::styled(
                         wrapped.to_string(),
-                        Style::default().add_modifier(Modifier::REVERSED),
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::REVERSED),
                     )));
                 }
             }
             Event::SoftBreak => current.push(' '),
             Event::HardBreak => {
-                push_current(&mut lines, &mut current, &mods_stack, width);
+                if !current.is_empty() {
+                    let style = style_from_mods(&mods_stack);
+                    for wrapped in wrap(current.trim_end(), width) {
+                        lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+                    }
+                    current.clear();
+                }
             }
             _ => {}
         }
     }
 
     if in_table {
-        // Close any unterminated table (robustness)
         let mut table_lines = render_table(&table_headers, &table_rows, width);
         lines.append(&mut table_lines);
     }
 
     if !current.is_empty() {
-        push_current(&mut lines, &mut current, &mods_stack, width);
+        let style = style_from_mods(&mods_stack);
+        for wrapped in wrap(current.trim_end(), width) {
+            lines.push(Line::from(Span::styled(wrapped.to_string(), style)));
+        }
     }
 
     lines
@@ -303,6 +337,9 @@ fn style_from_mods(mods: &[Modifier]) -> Style {
     let mut style = Style::default();
     for &m in mods {
         style = style.add_modifier(m);
+    }
+    if mods.contains(&Modifier::UNDERLINED) {
+        style = style.fg(Color::Blue);
     }
     style
 }
@@ -393,14 +430,16 @@ fn render_table(headers: &[String], rows: &[Vec<String>], max_width: usize) -> V
     let sep = draw_border('├', '┼', '┤', '─', &col_widths);
     let bottom = draw_border('└', '┴', '┘', '─', &col_widths);
 
-    out.push(Line::from(top));
+    // borders gray
+    let gray = Style::default().fg(Color::Gray);
+    out.push(Line::from(Span::styled(top, gray)));
 
     // Header (centered + bold)
     if cols > 0 {
         for phys in wrap_row(&norm_headers) {
             out.push(render_row_styled(&phys, &col_widths, true));
         }
-        out.push(Line::from(sep.clone()));
+        out.push(Line::from(Span::styled(sep.clone(), gray)));
     }
 
     // Body rows
@@ -408,12 +447,12 @@ fn render_table(headers: &[String], rows: &[Vec<String>], max_width: usize) -> V
         for phys in wrap_row(row) {
             out.push(render_row_styled(&phys, &col_widths, false));
         }
-        out.push(Line::from(sep.clone()));
+        out.push(Line::from(Span::styled(sep.clone(), gray)));
     }
 
     // Replace last separator with bottom border
     if let Some(last) = out.last_mut() {
-        *last = Line::from(bottom);
+        *last = Line::from(Span::styled(bottom, gray));
     }
 
     out
@@ -432,26 +471,10 @@ fn draw_border(left: char, mid: char, right: char, horiz: char, col_widths: &[us
     s
 }
 
-// fn render_row(cells: &[String], col_widths: &[usize], _header: bool) -> String {
-//     let mut s = String::new();
-//     s.push('│');
-//     for (i, cell) in cells.iter().enumerate() {
-//         s.push(' ');
-//         let w = col_widths[i];
-//         let cell_w = display_width(cell);
-//         s.push_str(cell);
-//         if cell_w < w {
-//             s.push_str(&" ".repeat(w - cell_w));
-//         }
-//         s.push(' ');
-//         s.push('│');
-//     }
-//     s
-// }
-
 fn render_row_styled(cells: &[String], col_widths: &[usize], header: bool) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::new();
-    spans.push(Span::raw("│"));
+    // left border in gray
+    spans.push(Span::styled("│", Style::default().fg(Color::Gray)));
     for (i, cell) in cells.iter().enumerate() {
         let w = col_widths[i];
         let content = if header {
@@ -463,11 +486,14 @@ fn render_row_styled(cells: &[String], col_widths: &[usize], header: bool) -> Li
         if header {
             styled = Span::styled(
                 format!(" {content} "),
-                Style::default().add_modifier(Modifier::BOLD),
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Cyan),
             );
         }
         spans.push(styled);
-        spans.push(Span::raw("│"));
+        // sep border between cols
+        spans.push(Span::styled("│", Style::default().fg(Color::Gray)));
     }
     Line::from(spans)
 }
