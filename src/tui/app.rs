@@ -167,6 +167,11 @@ impl App {
                 }
                 1 => {
                     self.refresh_file_list()?;
+                    // Reset search input when entering Browser
+                    self.search_input.clear();
+                    self.search_input.focused = false;
+                    self.filter = FileFilter::Transcripts;
+                    self.apply_filter();
                     self.state = AppState::Browser {
                         filter: FileFilter::Transcripts,
                         search: String::new(),
@@ -174,6 +179,11 @@ impl App {
                 }
                 2 => {
                     self.refresh_file_list()?;
+                    // Reset search input when entering Browser
+                    self.search_input.clear();
+                    self.search_input.focused = false;
+                    self.filter = FileFilter::Reports;
+                    self.apply_filter();
                     self.state = AppState::Browser {
                         filter: FileFilter::Reports,
                         search: String::new(),
@@ -225,45 +235,50 @@ impl App {
     }
 
     fn handle_browser_key(&mut self, key: KeyEvent) -> Result<()> {
-        match key.code {
-            KeyCode::Esc | KeyCode::Char('q') => {
-                self.state = AppState::Home;
-            }
-            KeyCode::Enter => {
-                if let Some(file) = self.file_list.get_selected() {
-                    self.open_file(file.clone())?;
+        if self.search_input.focused {
+            match key.code {
+                KeyCode::Enter => {
+                    self.search_input.focused = false;
+                }
+                KeyCode::Esc => {
+                    self.search_input.focused = false;
+                    self.search_input.clear();
+                    self.apply_filter();
+                }
+                _ => {
+                    self.search_input.handle_key(key);
+                    self.apply_search_filter();
                 }
             }
-            KeyCode::Delete => {
-                self.delete_selected_files()?;
-            }
-            KeyCode::Char('/') => {
-                // Start search mode
-                self.search_input.focused = true;
-            }
-            KeyCode::Char('1') => {
-                self.filter = FileFilter::All;
-                self.apply_filter();
-            }
-            KeyCode::Char('2') => {
-                self.filter = FileFilter::Transcripts;
-                self.apply_filter();
-            }
-            KeyCode::Char('3') => {
-                self.filter = FileFilter::Reports;
-                self.apply_filter();
-            }
-            _ => {
-                if self.search_input.focused {
-                    if key.code == KeyCode::Esc {
-                        self.search_input.focused = false;
-                        self.search_input.clear();
-                        self.apply_filter();
-                    } else {
-                        self.search_input.handle_key(key);
-                        self.apply_search_filter();
+        } else {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    self.state = AppState::Home;
+                }
+                KeyCode::Enter => {
+                    if let Some(file) = self.file_list.get_selected() {
+                        self.open_file(file.clone())?;
                     }
-                } else {
+                }
+                KeyCode::Delete => {
+                    self.delete_selected_files()?;
+                }
+                KeyCode::Char('/') => {
+                    self.search_input.focused = true;
+                }
+                KeyCode::Char('1') => {
+                    self.filter = FileFilter::All;
+                    self.apply_filter();
+                }
+                KeyCode::Char('2') => {
+                    self.filter = FileFilter::Transcripts;
+                    self.apply_filter();
+                }
+                KeyCode::Char('3') => {
+                    self.filter = FileFilter::Reports;
+                    self.apply_filter();
+                }
+                _ => {
                     self.file_list.handle_key(key);
                 }
             }
@@ -274,6 +289,10 @@ impl App {
     fn handle_viewer_key(&mut self, key: KeyEvent) -> Result<()> {
         match key.code {
             KeyCode::Esc | KeyCode::Char('q') => {
+                // Returning to Browser: reset search state
+                self.search_input.clear();
+                self.search_input.focused = false;
+                self.apply_filter();
                 self.state = AppState::Browser {
                     filter: self.filter.clone(),
                     search: String::new(),
@@ -281,7 +300,7 @@ impl App {
             }
             _ => {
                 if let Some(viewer) = &mut self.content_viewer {
-                    viewer.handle_key(key, self.viewer_height); // Approximate height
+                    viewer.handle_key(key, self.viewer_height);
                 }
             }
         }
