@@ -22,6 +22,10 @@ impl ReportService {
     }
 
     pub async fn generate_report(&self, transcript: &FetchedTranscript) -> Result<String> {
+        self.generate_report_text(&transcript.text()).await
+    }
+
+    pub async fn generate_report_text(&self, transcript_text: &str) -> Result<String> {
         println!("Generating report...");
 
         let request = CreateResponseArgs::default()
@@ -29,16 +33,16 @@ impl ReportService {
             .model("gpt-4.1-mini")
             .input(Input::Items(vec![
                 InputItem::Message(
-                InputMessageArgs::default()
-                    .role(Role::System)
-                    .content(SYSTEM_PROMPT.to_string())
-                    .build()?,
-            ),
-            InputItem::Message(
-                InputMessageArgs::default()
-                    .role(Role::User)
-                    .content(format!(
-                        "### rol
+                    InputMessageArgs::default()
+                        .role(Role::System)
+                        .content(SYSTEM_PROMPT.to_string())
+                        .build()?,
+                ),
+                InputItem::Message(
+                    InputMessageArgs::default()
+                        .role(Role::User)
+                        .content(format!(
+                            "### rol
 Tu misión: extraer **cada** elemento significativo del vídeo sin omitir nada, con precisión milimétrica.
 
 ### Entrada
@@ -111,11 +115,14 @@ Ordenadas por frecuencia descendente.
 Analiza ahora el contenido entre las etiquetas:
 
 <TRANSCRIPT>
-{:?}
+{}
 </TRANSCRIPT>
-", transcript.text()))
-        .build()?,
-                    )]))
+",
+                            transcript_text
+                        ))
+                        .build()?,
+                ),
+            ]))
             .build()?;
 
         let response = self.client.responses().create(request).await?;

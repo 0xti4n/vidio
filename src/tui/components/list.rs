@@ -78,10 +78,10 @@ impl FileList {
     }
 
     pub fn toggle_selected(&mut self) {
-        if let Some(i) = self.state.selected() {
-            if i < self.selected_items.len() {
-                self.selected_items[i] = !self.selected_items[i];
-            }
+        if let Some(i) = self.state.selected()
+            && i < self.selected_items.len()
+        {
+            self.selected_items[i] = !self.selected_items[i];
         }
     }
 

@@ -77,17 +77,18 @@ impl StorageService {
                 let entry = entry?;
                 let path = entry.path();
 
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with("transcript_") && name.ends_with(".txt") {
-                        let metadata = entry.metadata()?;
-                        files.push(FileEntry {
-                            path: path.clone(),
-                            name: name.to_string(),
-                            file_type: FileType::Transcript,
-                            size: metadata.len(),
-                            modified: metadata.modified()?,
-                        });
-                    }
+                if let Some(name) = path.file_name().and_then(|n| n.to_str())
+                    && name.starts_with("transcript_")
+                    && name.ends_with(".txt")
+                {
+                    let metadata = entry.metadata()?;
+                    files.push(FileEntry {
+                        path: path.clone(),
+                        name: name.to_string(),
+                        file_type: FileType::Transcript,
+                        size: metadata.len(),
+                        modified: metadata.modified()?,
+                    });
                 }
             }
         }
@@ -98,17 +99,18 @@ impl StorageService {
                 let entry = entry?;
                 let path = entry.path();
 
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with("report_") && name.ends_with(".md") {
-                        let metadata = entry.metadata()?;
-                        files.push(FileEntry {
-                            path: path.clone(),
-                            name: name.to_string(),
-                            file_type: FileType::Report,
-                            size: metadata.len(),
-                            modified: metadata.modified()?,
-                        });
-                    }
+                if let Some(name) = path.file_name().and_then(|n| n.to_str())
+                    && name.starts_with("report_")
+                    && name.ends_with(".md")
+                {
+                    let metadata = entry.metadata()?;
+                    files.push(FileEntry {
+                        path: path.clone(),
+                        name: name.to_string(),
+                        file_type: FileType::Report,
+                        size: metadata.len(),
+                        modified: metadata.modified()?,
+                    });
                 }
             }
         }

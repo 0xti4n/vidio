@@ -83,12 +83,10 @@ async fn run_cli_report(video_id: String) -> Result<()> {
 
     let transcript_content = StorageService::load_transcript(&video_id)?;
 
-    // We need to create a mock FetchedTranscript for the report service
-    // In a real implementation, you'd want to store more metadata
-    let mock_transcript = create_mock_transcript(&video_id, &transcript_content);
-
     let report_service = ReportService::new();
-    let report_content = report_service.generate_report(&mock_transcript).await?;
+    let report_content = report_service
+        .generate_report_text(&transcript_content)
+        .await?;
 
     let report_path = StorageService::save_report(&video_id, &report_content)?;
     println!("Report saved to: {report_path:?}");
@@ -162,30 +160,4 @@ async fn run_tui() -> Result<()> {
     // Restore terminal
     tui_restore()?;
     Ok(())
-}
-
-// Helper function to create a mock transcript for report generation
-fn create_mock_transcript(video_id: &str, _content: &str) -> yt_transcript_rs::FetchedTranscript {
-    // This is a workaround since we can't easily recreate the original transcript object
-    // In a real implementation, you'd want to store the original transcript metadata
-    use yt_transcript_rs::FetchedTranscript;
-
-    // Create a simple mock transcript
-    // We'll need to check the actual structure of FetchedTranscript
-    // For now, let's try to create it with basic fields
-    let _transcript_service = TranscriptService::new().unwrap();
-
-    // As a workaround, we'll try to fetch a real transcript structure
-    // and then replace the content. This is hacky but should work for now.
-    // In practice, you'd store the original transcript metadata.
-
-    // For now, let's just return an empty transcript
-    // This will need to be fixed with proper metadata storage
-    FetchedTranscript {
-        video_id: video_id.to_string(),
-        language: "Unknown".to_string(),
-        language_code: "unk".to_string(),
-        is_generated: false,
-        snippets: vec![], // Empty for now - real implementation would parse content
-    }
 }

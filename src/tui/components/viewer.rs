@@ -203,10 +203,10 @@ fn parse_markdown_to_lines(src: &str, width: usize) -> Vec<Line<'static>> {
             Event::End(tag_end) => match tag_end {
                 TagEnd::Heading(_) => {
                     let mut mods = mods_stack.clone();
-                    if let Some(level) = header_level {
-                        if level <= 2 {
-                            mods.push(Modifier::UNDERLINED);
-                        }
+                    if let Some(level) = header_level
+                        && level <= 2
+                    {
+                        mods.push(Modifier::UNDERLINED);
                     }
                     let style = style_from_mods(&mods).fg(Color::Cyan);
                     if !current.is_empty() {

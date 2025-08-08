@@ -3,3 +3,5 @@
 /transcripts
 *.md
 *.txt
+
+.env
