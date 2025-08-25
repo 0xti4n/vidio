@@ -25,22 +25,24 @@ impl TranscriptService {
             .fetch_transcript(video_id, languages, preserve_formatting)
             .await
         {
-            Ok(transcript) => {
-                // println!("Successfully fetched transcript!");
-                // println!("Video ID: {}", transcript.video_id);
-                // println!(
-                //     "Language: {} ({})",
-                //     transcript.language, transcript.language_code
-                // );
-                // println!("Is auto-generated: {}", transcript.is_generated);
-                // println!("Number of snippets: {}", transcript.snippets.len());
-
-                Ok(transcript)
-            }
+            Ok(transcript) => Ok(transcript),
             Err(e) => Err(crate::error::Error::custom(format!(
                 "Failed to fetch transcript: {e}"
             ))),
         }
+    }
+
+    pub fn format_transcript(&self, transcript: &FetchedTranscript) -> Vec<String> {
+        let mut formatted = Vec::new();
+        for snippet in transcript.snippets.iter() {
+            formatted.push(format!(
+                "[{:.1}-{:.1}s] {}",
+                snippet.start,
+                snippet.start + snippet.duration,
+                snippet.text
+            ));
+        }
+        formatted
     }
 }
 

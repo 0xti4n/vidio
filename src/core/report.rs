@@ -1,10 +1,15 @@
 use crate::error::Result;
 use async_openai::{
     self,
-    types::responses::{
-        Content, CreateResponseArgs, Input, InputItem, InputMessageArgs, OutputContent, Role,
+    types::{
+        ReasoningEffort,
+        responses::{
+            Content, CreateResponseArgs, Input, InputItem, InputMessageArgs, OutputContent,
+            ReasoningConfigArgs, Role,
+        },
     },
 };
+
 use yt_transcript_rs::FetchedTranscript;
 
 const SYSTEM_PROMPT: &str = r#"Eres un ANALISTA DE CONTENIDO ULTRA-DETALLISTA"#;
@@ -26,11 +31,14 @@ impl ReportService {
     }
 
     pub async fn generate_report_text(&self, transcript_text: &str) -> Result<String> {
-        println!("Generating report...");
-
         let request = CreateResponseArgs::default()
-            .max_output_tokens(32768_u32)
-            .model("gpt-4.1-mini")
+            .max_output_tokens(128000_u32)
+            .model("gpt-5")
+            .reasoning(ReasoningConfigArgs::default()
+                .effort(ReasoningEffort::High)
+                // .summary(ReasoningSummary::Detailed)
+                .build()?
+            )
             .input(Input::Items(vec![
                 InputItem::Message(
                     InputMessageArgs::default()

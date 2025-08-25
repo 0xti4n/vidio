@@ -105,9 +105,9 @@ checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
 name = "async-openai"
-version = "0.29.0"
+version = "0.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31acf814d6b499e33ec894bb0fd7ddaf2665b44fbdd42b858d736449271fde0c"
+checksum = "88eb13993ef1074d732ab4e06bbb9545fe9be9ffeb738647bc24ac5327eb4797"
 dependencies = [
  "async-openai-macros",
  "backoff",
@@ -116,7 +116,7 @@ dependencies = [
  "derive_builder",
  "eventsource-stream",
  "futures",
- "rand 0.8.5",
+ "rand 0.9.1",
  "reqwest",
  "reqwest-eventsource",
  "secrecy",
@@ -3263,7 +3263,7 @@ dependencies = [
  "serde_json",
  "textwrap",
  "tokio",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.0",
  "yt-transcript-rs",
 ]
 

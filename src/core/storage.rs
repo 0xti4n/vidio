@@ -1,3 +1,4 @@
+use crate::core::transcript;
 use crate::error::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -30,11 +31,14 @@ impl StorageService {
 
     pub fn save_transcript(transcript: &FetchedTranscript) -> Result<PathBuf> {
         Self::ensure_directories()?;
+        let transcript_service = transcript::TranscriptService::new()?;
 
         let file_name = format!("transcript_{}.txt", transcript.video_id);
         let path = PathBuf::from("transcripts").join(&file_name);
 
-        fs::write(&path, transcript.text())?;
+        let formatted_transcript = transcript_service.format_transcript(transcript);
+        let content = formatted_transcript.join("\n");
+        fs::write(&path, &content)?;
         println!("Transcript saved to: {}", path.display());
 
         Ok(path)
