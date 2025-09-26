@@ -10,8 +10,8 @@ derive_more = { version = "2.0.1", features = ["full"] }
 async-openai = "0.29.3"
 ratatui = "0.29.0"
 crossterm = "0.29.0"
-clap = { version = "4.5.47", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4.5.48", features = ["derive"] }
+serde = { version = "1.0.227", features = ["derive"] }
 serde_json = "1.0.145"
 chrono = { version = "0.4.42", features = ["serde"] }
 html-escape = "0.2.13"
