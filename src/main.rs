@@ -64,14 +64,14 @@ async fn run_cli_get(
         .await?;
 
     // Save transcript
-    let transcript_path = StorageService::save_transcript(&transcript)?;
+    let transcript_path = StorageService::save_transcript(&transcript).await?;
     println!("Transcript saved to: {transcript_path:?}");
 
     // Generate report if requested
     if generate_report {
         println!("Generating report...");
         let report_content = report_service.generate_report(&transcript).await?;
-        let report_path = StorageService::save_report(&video_id, &report_content)?;
+        let report_path = StorageService::save_report(&video_id, &report_content).await?;
         println!("Report saved to: {report_path:?}");
     }
 
@@ -81,14 +81,14 @@ async fn run_cli_get(
 async fn run_cli_report(video_id: String) -> Result<()> {
     println!("Generating report for video: {video_id}");
 
-    let transcript_content = StorageService::load_transcript(&video_id)?;
+    let transcript_content = StorageService::load_transcript(&video_id).await?;
 
     let report_service = ReportService::new();
     let report_content = report_service
         .generate_report_text(&transcript_content)
         .await?;
 
-    let report_path = StorageService::save_report(&video_id, &report_content)?;
+    let report_path = StorageService::save_report(&video_id, &report_content).await?;
     println!("Report saved to: {report_path:?}");
 
     Ok(())

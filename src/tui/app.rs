@@ -60,6 +60,7 @@ pub struct App {
     pub file_list: FileList,
     pub search_input: InputField,
     pub filter: FileFilter,
+    pub file_cache: Vec<FileEntry>,
 
     // Viewer screen
     pub content_viewer: Option<Viewer>,
@@ -81,7 +82,8 @@ impl App {
     pub fn new() -> Result<Self> {
         let transcript_service = TranscriptService::new()?;
         let report_service = ReportService::new();
-        let files = StorageService::list_files().unwrap_or_default();
+        let file_cache = StorageService::list_files().unwrap_or_default();
+        let file_list = FileList::new(file_cache.clone());
 
         Ok(Self {
             state: AppState::Home,
@@ -95,9 +97,10 @@ impl App {
             generate_report: true,
             input_focus: 0,
 
-            file_list: FileList::new(files),
+            file_list,
             search_input: InputField::new("Search", "Filter files..."),
             filter: FileFilter::All,
+            file_cache,
 
             content_viewer: None,
             viewer_height: 0,
@@ -432,13 +435,11 @@ impl App {
                     let _ = tx.send("LOG:Successfully fetched transcript!".to_string());
                     let _ = tx.send("LOG:Saving transcript to file...".to_string());
 
-                    // Save transcript
-                    match StorageService::save_transcript(&transcript) {
+                    match StorageService::save_transcript(&transcript).await {
                         Ok(_) => {
                             let _ = tx.send("PROGRESS:0.6".to_string());
                             let _ = tx.send("LOG:Transcript saved successfully!".to_string());
 
-                            // Generate report if requested
                             if request.generate_report {
                                 let _ = tx.send("STATUS:Generating report...".to_string());
                                 let _ = tx.send("PROGRESS:0.7".to_string());
@@ -454,7 +455,9 @@ impl App {
                                         match StorageService::save_report(
                                             &video_id,
                                             &report_content,
-                                        ) {
+                                        )
+                                        .await
+                                        {
                                             Ok(_) => {
                                                 let _ = tx.send("PROGRESS:1.0".to_string());
                                                 let _ = tx.send(
@@ -504,19 +507,26 @@ impl App {
 
     fn refresh_file_list(&mut self) -> Result<()> {
         let files = StorageService::list_files()?;
-        self.file_list.update_items(files);
+        self.file_cache = files;
+
+        if self.search_input.value.trim().is_empty() {
+            self.apply_filter();
+        } else {
+            self.apply_search_filter();
+        }
         Ok(())
     }
 
     fn apply_filter(&mut self) {
-        let all_files = StorageService::list_files().unwrap_or_default();
-        let filtered_files: Vec<FileEntry> = all_files
-            .into_iter()
+        let filtered_files: Vec<FileEntry> = self
+            .file_cache
+            .iter()
             .filter(|file| match self.filter {
                 FileFilter::All => true,
                 FileFilter::Transcripts => file.file_type == FileType::Transcript,
                 FileFilter::Reports => file.file_type == FileType::Report,
             })
+            .cloned()
             .collect();
 
         self.file_list.update_items(filtered_files);
@@ -529,9 +539,9 @@ impl App {
             return;
         }
 
-        let all_files = StorageService::list_files().unwrap_or_default();
-        let filtered_files: Vec<FileEntry> = all_files
-            .into_iter()
+        let filtered_files: Vec<FileEntry> = self
+            .file_cache
+            .iter()
             .filter(|file| {
                 let matches_filter = match self.filter {
                     FileFilter::All => true,
@@ -543,6 +553,7 @@ impl App {
 
                 matches_filter && matches_search
             })
+            .cloned()
             .collect();
 
         self.file_list.update_items(filtered_files);
@@ -563,7 +574,7 @@ impl App {
         for file in selected_files {
             StorageService::delete_file(&file.path)?;
         }
-        self.apply_filter();
+        self.refresh_file_list()?;
         Ok(())
     }
 }

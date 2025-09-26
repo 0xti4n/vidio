@@ -32,7 +32,7 @@ impl TranscriptService {
         }
     }
 
-    pub fn format_transcript(&self, transcript: &FetchedTranscript) -> Vec<String> {
+    pub fn format_transcript(transcript: &FetchedTranscript) -> Vec<String> {
         let mut formatted = Vec::new();
         for snippet in transcript.snippets.iter() {
             formatted.push(format!(

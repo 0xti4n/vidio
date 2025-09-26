@@ -1,9 +1,11 @@
 use crate::core::transcript;
 use crate::error::Result;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs as std_fs;
 use std::path::{Path, PathBuf};
 use yt_transcript_rs::FetchedTranscript;
+
+use tokio::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileEntry {
@@ -24,50 +26,48 @@ pub struct StorageService;
 
 impl StorageService {
     fn ensure_directories() -> Result<()> {
-        fs::create_dir_all("transcripts")?;
-        fs::create_dir_all("reports")?;
+        std_fs::create_dir_all("transcripts")?;
+        std_fs::create_dir_all("reports")?;
         Ok(())
     }
 
-    pub fn save_transcript(transcript: &FetchedTranscript) -> Result<PathBuf> {
+    pub async fn save_transcript(transcript: &FetchedTranscript) -> Result<PathBuf> {
         Self::ensure_directories()?;
-        let transcript_service = transcript::TranscriptService::new()?;
-
         let file_name = format!("transcript_{}.txt", transcript.video_id);
         let path = PathBuf::from("transcripts").join(&file_name);
 
-        let formatted_transcript = transcript_service.format_transcript(transcript);
+        let formatted_transcript = transcript::TranscriptService::format_transcript(transcript);
         let content = formatted_transcript.join("\n");
-        fs::write(&path, &content)?;
+        fs::write(&path, &content).await?;
         println!("Transcript saved to: {}", path.display());
 
         Ok(path)
     }
 
-    pub fn save_report(video_id: &str, content: &str) -> Result<PathBuf> {
+    pub async fn save_report(video_id: &str, content: &str) -> Result<PathBuf> {
         Self::ensure_directories()?;
 
         let file_name = format!("report_{video_id}.md");
         let path = PathBuf::from("reports").join(&file_name);
 
-        fs::write(&path, content)?;
+        fs::write(&path, content).await?;
         println!("Report saved to: {}", path.display());
 
         Ok(path)
     }
 
-    pub fn load_transcript(video_id: &str) -> Result<String> {
+    pub async fn load_transcript(video_id: &str) -> Result<String> {
         let file_name = format!("transcript_{video_id}.txt");
         let path = PathBuf::from("transcripts").join(&file_name);
-        let content = fs::read_to_string(path)?;
+        let content = fs::read_to_string(path).await?;
         Ok(content)
     }
 
     #[allow(dead_code)]
-    pub fn load_report(video_id: &str) -> Result<String> {
+    pub async fn load_report(video_id: &str) -> Result<String> {
         let file_name = format!("report_{video_id}.md");
         let path = PathBuf::from("reports").join(&file_name);
-        let content = fs::read_to_string(path)?;
+        let content = fs::read_to_string(path).await?;
         Ok(content)
     }
 
@@ -76,7 +76,7 @@ impl StorageService {
         let mut files = Vec::new();
 
         // Check transcripts folder
-        if let Ok(entries) = fs::read_dir("transcripts") {
+        if let Ok(entries) = std_fs::read_dir("transcripts") {
             for entry in entries {
                 let entry = entry?;
                 let path = entry.path();
@@ -98,7 +98,7 @@ impl StorageService {
         }
 
         // Check reports folder
-        if let Ok(entries) = fs::read_dir("reports") {
+        if let Ok(entries) = std_fs::read_dir("reports") {
             for entry in entries {
                 let entry = entry?;
                 let path = entry.path();
@@ -126,7 +126,7 @@ impl StorageService {
     }
 
     pub fn delete_file(path: &Path) -> Result<()> {
-        fs::remove_file(path)?;
+        std_fs::remove_file(path)?;
         Ok(())
     }
 
