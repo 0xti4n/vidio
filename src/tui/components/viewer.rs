@@ -48,16 +48,38 @@ impl Viewer {
                     self.scroll += 1;
                 }
             }
+            KeyCode::Char('k') => {
+                if self.scroll > 0 {
+                    self.scroll -= 1;
+                }
+            }
+            KeyCode::Char('j') => {
+                if self.scroll < lines.saturating_sub(page_size) {
+                    self.scroll += 1;
+                }
+            }
             KeyCode::PageUp => {
                 self.scroll = self.scroll.saturating_sub(page_size);
             }
             KeyCode::PageDown => {
                 self.scroll = (self.scroll + page_size).min(lines.saturating_sub(page_size));
             }
+            KeyCode::Char('b') => {
+                self.scroll = self.scroll.saturating_sub(page_size);
+            }
+            KeyCode::Char(' ') => {
+                self.scroll = (self.scroll + page_size).min(lines.saturating_sub(page_size));
+            }
             KeyCode::Home => {
                 self.scroll = 0;
             }
             KeyCode::End => {
+                self.scroll = lines.saturating_sub(page_size);
+            }
+            KeyCode::Char('g') => {
+                self.scroll = 0;
+            }
+            KeyCode::Char('G') => {
                 self.scroll = lines.saturating_sub(page_size);
             }
             _ => {}

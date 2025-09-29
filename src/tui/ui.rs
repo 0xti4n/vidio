@@ -247,11 +247,12 @@ fn draw_browser(f: &mut Frame, app: &mut App) {
     app.file_list.render(f, right_chunks[0], "Files");
 
     // Help
-    let help =
-        Paragraph::new("[Enter] Open  [Del] Delete  [Space] Select  [/] Search  [1-3] Filters")
-            .style(Style::default().fg(Color::Gray))
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::ALL));
+    let help = Paragraph::new(
+        "[1-3] Filters [Enter] Open  [Del] Delete  [Space] Select  [/] Search  [PgUp/PgDn/Home/End] Scroll",
+    )
+    .style(Style::default().fg(Color::Gray))
+    .alignment(Alignment::Center)
+    .block(Block::default().borders(Borders::ALL));
     f.render_widget(help, right_chunks[1]);
 }
 
@@ -268,10 +269,12 @@ fn draw_viewer(f: &mut Frame, app: &mut App) {
     }
 
     // Help
-    let help = Paragraph::new("[↑↓] Scroll  [PgUp/PgDn] Page  [Home/End] Home/End  [Esc] Back")
-        .style(Style::default().fg(Color::Gray))
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL));
+    let help = Paragraph::new(
+        "[↑↓/j k] Scroll  [PgUp/PgDn/Space/b] Page  [Home/End/g/G] Jump  [Esc] Back",
+    )
+    .style(Style::default().fg(Color::Gray))
+    .alignment(Alignment::Center)
+    .block(Block::default().borders(Borders::ALL));
     f.render_widget(help, chunks[1]);
 }
 
