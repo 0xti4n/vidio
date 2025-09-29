@@ -2,7 +2,15 @@
 
 A powerful YouTube transcript downloader and analyzer built in Rust, featuring both CLI and TUI interfaces with AI-powered content analysis.
 
+<p align="center">
+  <img src="./images/vidio.png" alt="Vidio TUI" width="80%" />
+</p>
+
 ## Features
+
+<p align="center">
+  <img src="./images/views.png" alt="Vidio TUI" width="80%" />
+</p>
 
 ### 🎯 Core Functionality
 - **YouTube Transcript Download**: Extract transcripts from YouTube videos using video URLs or IDs
