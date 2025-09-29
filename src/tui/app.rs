@@ -421,86 +421,108 @@ impl App {
             // Convert languages to the correct format
             let languages: Vec<&str> = request.languages.iter().map(|s| s.as_str()).collect();
 
+            let transcript_exists = StorageService::transcript_exists(&video_id);
+            let report_exists = StorageService::report_exists(&video_id);
+            let needs_report = request.generate_report && !report_exists;
+
+            if transcript_exists && !needs_report {
+                let _ = tx.send("STATUS:Already processed".to_string());
+                let _ = tx.send("PROGRESS:1.0".to_string());
+                let _ = tx.send(
+                    "LOG:Transcript (and report if requested) already exist. Skipping.".to_string(),
+                );
+                let _ = tx.send("COMPLETE".to_string());
+                return;
+            }
+
+            let mut fetched_transcript = None;
+
             // Fetch transcript
-            let _ = tx.send("STATUS:Downloading transcript...".to_string());
-            let _ = tx.send("PROGRESS:0.25".to_string());
-            let _ = tx.send("LOG:Fetching transcript...".to_string());
+            if !transcript_exists {
+                let _ = tx.send("STATUS:Downloading transcript...".to_string());
+                let _ = tx.send("PROGRESS:0.25".to_string());
+                let _ = tx.send("LOG:Fetching transcript...".to_string());
 
-            match transcript_service
-                .fetch_transcript(&video_id, &languages, request.preserve_formatting)
-                .await
-            {
-                Ok(transcript) => {
-                    let _ = tx.send("PROGRESS:0.5".to_string());
-                    let _ = tx.send("LOG:Successfully fetched transcript!".to_string());
-                    let _ = tx.send("LOG:Saving transcript to file...".to_string());
+                match transcript_service
+                    .fetch_transcript(&video_id, &languages, request.preserve_formatting)
+                    .await
+                {
+                    Ok(transcript) => {
+                        let _ = tx.send("PROGRESS:0.5".to_string());
+                        let _ = tx.send("LOG:Successfully fetched transcript!".to_string());
+                        let _ = tx.send("LOG:Saving transcript to file...".to_string());
 
-                    match StorageService::save_transcript(&transcript).await {
-                        Ok(_) => {
-                            let _ = tx.send("PROGRESS:0.6".to_string());
-                            let _ = tx.send("LOG:Transcript saved successfully!".to_string());
+                        match StorageService::save_transcript(&transcript).await {
+                            Ok(_) => {
+                                let _ = tx.send("PROGRESS:0.6".to_string());
+                                let _ = tx.send("LOG:Transcript saved successfully!".to_string());
+                                fetched_transcript = Some(transcript);
+                            }
+                            Err(e) => {
+                                let _ = tx.send(format!("LOG:Error saving transcript: {e}"));
+                                let _ = tx.send("STATUS:Error saving transcript".to_string());
+                                let _ = tx.send("COMPLETE".to_string());
+                                return;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(format!("LOG:Error fetching transcript: {e}"));
+                        let _ = tx.send("STATUS:Error downloading transcript".to_string());
+                        let _ = tx.send("COMPLETE".to_string());
+                        return;
+                    }
+                }
+            } else {
+                let _ = tx.send("PROGRESS:0.5".to_string());
+                let _ = tx
+                    .send("LOG:Transcript already exists locally. Skipping download.".to_string());
+            }
 
-                            if request.generate_report {
-                                let _ = tx.send("STATUS:Generating report...".to_string());
-                                let _ = tx.send("PROGRESS:0.7".to_string());
-                                let _ = tx.send("LOG:Generating report...".to_string());
+            if needs_report {
+                let _ = tx.send("STATUS:Generating report...".to_string());
+                let _ = tx.send("PROGRESS:0.7".to_string());
+                let _ = tx.send("LOG:Generating report...".to_string());
 
-                                match report_service.generate_report(&transcript).await {
-                                    Ok(report_content) => {
-                                        let _ = tx.send("PROGRESS:0.9".to_string());
-                                        let _ = tx
-                                            .send("LOG:Report generated successfully!".to_string());
-                                        let _ = tx.send("LOG:Saving report to file...".to_string());
+                let result = if let Some(transcript) = fetched_transcript.as_ref() {
+                    report_service.generate_report(transcript).await
+                } else {
+                    match StorageService::load_transcript(&video_id).await {
+                        Ok(content) => report_service.generate_report_text(&content).await,
+                        Err(e) => Err(e),
+                    }
+                };
 
-                                        match StorageService::save_report(
-                                            &video_id,
-                                            &report_content,
-                                        )
-                                        .await
-                                        {
-                                            Ok(_) => {
-                                                let _ = tx.send("PROGRESS:1.0".to_string());
-                                                let _ = tx.send(
-                                                    "LOG:Report saved successfully!".to_string(),
-                                                );
-                                                let _ = tx.send("STATUS:Completed".to_string());
-                                                let _ = tx.send("COMPLETE".to_string());
-                                            }
-                                            Err(e) => {
-                                                let _ = tx
-                                                    .send(format!("LOG:Error saving report: {e}"));
-                                                let _ = tx
-                                                    .send("STATUS:Error saving report".to_string());
-                                                let _ = tx.send("COMPLETE".to_string());
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        let _ =
-                                            tx.send(format!("LOG:Error generating report: {e}"));
-                                        let _ =
-                                            tx.send("STATUS:Error generating report".to_string());
-                                        let _ = tx.send("COMPLETE".to_string());
-                                    }
-                                }
-                            } else {
+                match result {
+                    Ok(report_content) => {
+                        let _ = tx.send("PROGRESS:0.9".to_string());
+                        let _ = tx.send("LOG:Report generated successfully!".to_string());
+                        let _ = tx.send("LOG:Saving report to file...".to_string());
+
+                        match StorageService::save_report(&video_id, &report_content).await {
+                            Ok(_) => {
                                 let _ = tx.send("PROGRESS:1.0".to_string());
+                                let _ = tx.send("LOG:Report saved successfully!".to_string());
                                 let _ = tx.send("STATUS:Completed".to_string());
                                 let _ = tx.send("COMPLETE".to_string());
                             }
-                        }
-                        Err(e) => {
-                            let _ = tx.send(format!("LOG:Error saving transcript: {e}"));
-                            let _ = tx.send("STATUS:Error saving transcript".to_string());
-                            let _ = tx.send("COMPLETE".to_string());
+                            Err(e) => {
+                                let _ = tx.send(format!("LOG:Error saving report: {e}"));
+                                let _ = tx.send("STATUS:Error saving report".to_string());
+                                let _ = tx.send("COMPLETE".to_string());
+                            }
                         }
                     }
+                    Err(e) => {
+                        let _ = tx.send(format!("LOG:Error generating report: {e}"));
+                        let _ = tx.send("STATUS:Error generating report".to_string());
+                        let _ = tx.send("COMPLETE".to_string());
+                    }
                 }
-                Err(e) => {
-                    let _ = tx.send(format!("LOG:Error fetching transcript: {e}"));
-                    let _ = tx.send("STATUS:Error downloading transcript".to_string());
-                    let _ = tx.send("COMPLETE".to_string());
-                }
+            } else {
+                let _ = tx.send("PROGRESS:1.0".to_string());
+                let _ = tx.send("STATUS:Completed".to_string());
+                let _ = tx.send("COMPLETE".to_string());
             }
         });
     }

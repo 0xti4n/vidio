@@ -57,22 +57,50 @@ async fn run_cli_get(
 
     let languages: Vec<&str> = languages.split(',').map(|s| s.trim()).collect();
 
-    // Fetch transcript
-    println!("Fetching transcript...");
-    let transcript = transcript_service
-        .fetch_transcript(&video_id, &languages, preserve_formatting)
-        .await?;
+    let transcript_exists = StorageService::transcript_exists(&video_id);
+    let report_exists = StorageService::report_exists(&video_id);
+    let needs_report = generate_report && !report_exists;
 
-    // Save transcript
-    let transcript_path = StorageService::save_transcript(&transcript).await?;
-    println!("Transcript saved to: {transcript_path:?}");
+    if transcript_exists && !needs_report {
+        println!("Transcript already exists locally. Skipping processing.");
+        if generate_report {
+            println!("Report already exists as well.");
+        }
+        return Ok(());
+    }
+
+    let mut fetched_transcript = None;
+
+    // Fetch transcript
+    if !transcript_exists {
+        println!("Fetching transcript...");
+        let transcript = transcript_service
+            .fetch_transcript(&video_id, &languages, preserve_formatting)
+            .await?;
+
+        let transcript_path = StorageService::save_transcript(&transcript).await?;
+        println!("Transcript saved to: {transcript_path:?}");
+        fetched_transcript = Some(transcript);
+    } else {
+        println!("Transcript already saved. Skipping download.");
+    }
 
     // Generate report if requested
-    if generate_report {
+    if needs_report {
         println!("Generating report...");
-        let report_content = report_service.generate_report(&transcript).await?;
+        let report_content = if let Some(transcript) = fetched_transcript.as_ref() {
+            report_service.generate_report(transcript).await?
+        } else {
+            let transcript_content = StorageService::load_transcript(&video_id).await?;
+            report_service
+                .generate_report_text(&transcript_content)
+                .await?
+        };
+
         let report_path = StorageService::save_report(&video_id, &report_content).await?;
         println!("Report saved to: {report_path:?}");
+    } else if generate_report {
+        println!("Report already exists. Skipping generation.");
     }
 
     Ok(())

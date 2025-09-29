@@ -27,7 +27,9 @@ impl ReportService {
     }
 
     pub async fn generate_report(&self, transcript: &FetchedTranscript) -> Result<String> {
-        self.generate_report_text(&transcript.text()).await
+        let formatted = crate::core::transcript::TranscriptService::format_transcript(transcript);
+        let formatted_text = formatted.join("\n");
+        self.generate_report_text(&formatted_text).await
     }
 
     pub async fn generate_report_text(&self, transcript_text: &str) -> Result<String> {
@@ -150,6 +152,76 @@ Analiza ahora el contenido entre las etiquetas:
             }
         }
 
-        Ok(content)
+        Ok(ensure_table_headers(&content))
     }
+}
+
+struct TableTemplate {
+    section_marker: &'static str,
+    header_lines: &'static [&'static str],
+    header_keywords: &'static [&'static str],
+}
+
+fn ensure_table_headers(report: &str) -> String {
+    const TABLES: &[TableTemplate] = &[
+        TableTemplate {
+            section_marker: "#### 1. Metadata",
+            header_lines: &["| Campo | Valor |", "|-------|-------|"],
+            header_keywords: &["campo", "valor"],
+        },
+        TableTemplate {
+            section_marker: "#### 3. Desglose",
+            header_lines: &[
+                "| # | ⏱ | Orador* | Texto literal | Palabras clave | Tonalidad** |",
+                "|---|----|---------|---------------|----------------|-------------|",
+            ],
+            header_keywords: &["#", "⏱", "orador", "texto", "palabras", "tonalidad"],
+        },
+        TableTemplate {
+            section_marker: "#### 4. Entidades",
+            header_lines: &[
+                "| Entidad | Tipo (persona, marca, lugar…) | Nº de menciones | Primera mención ⏱ |",
+                "|---------|------------------------------|-----------------|-------------------|",
+            ],
+            header_keywords: &["entidad", "tipo", "mención"],
+        },
+        TableTemplate {
+            section_marker: "#### 5. Preguntas",
+            header_lines: &["| Pregunta | Timestamp |", "|----------|-----------|"],
+            header_keywords: &["pregunta", "timestamp"],
+        },
+    ];
+
+    let mut lines: Vec<String> = report.lines().map(|l| l.to_string()).collect();
+
+    for table in TABLES {
+        if let Some(section_idx) = lines
+            .iter()
+            .position(|line| line.trim_start().starts_with(table.section_marker))
+        {
+            let mut insert_idx = section_idx + 1;
+            while insert_idx < lines.len() && lines[insert_idx].trim().is_empty() {
+                insert_idx += 1;
+            }
+
+            let header_present =
+                if insert_idx < lines.len() && lines[insert_idx].trim_start().starts_with('|') {
+                    let normalized = lines[insert_idx].to_lowercase();
+                    table
+                        .header_keywords
+                        .iter()
+                        .all(|kw| normalized.contains(kw))
+                } else {
+                    false
+                };
+
+            if !header_present {
+                let insert_lines: Vec<String> =
+                    table.header_lines.iter().map(|s| s.to_string()).collect();
+                lines.splice(insert_idx..insert_idx, insert_lines);
+            }
+        }
+    }
+
+    lines.join("\n")
 }

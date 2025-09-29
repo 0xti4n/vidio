@@ -31,10 +31,31 @@ impl StorageService {
         Ok(())
     }
 
+    fn transcript_path(video_id: &str) -> PathBuf {
+        PathBuf::from("transcripts").join(format!("transcript_{video_id}.txt"))
+    }
+
+    fn report_path(video_id: &str) -> PathBuf {
+        PathBuf::from("reports").join(format!("report_{video_id}.md"))
+    }
+
+    pub fn transcript_exists(video_id: &str) -> bool {
+        if Self::ensure_directories().is_err() {
+            return false;
+        }
+        Self::transcript_path(video_id).exists()
+    }
+
+    pub fn report_exists(video_id: &str) -> bool {
+        if Self::ensure_directories().is_err() {
+            return false;
+        }
+        Self::report_path(video_id).exists()
+    }
+
     pub async fn save_transcript(transcript: &FetchedTranscript) -> Result<PathBuf> {
         Self::ensure_directories()?;
-        let file_name = format!("transcript_{}.txt", transcript.video_id);
-        let path = PathBuf::from("transcripts").join(&file_name);
+        let path = Self::transcript_path(&transcript.video_id);
 
         let formatted_transcript = transcript::TranscriptService::format_transcript(transcript);
         let content = formatted_transcript.join("\n");
@@ -47,8 +68,7 @@ impl StorageService {
     pub async fn save_report(video_id: &str, content: &str) -> Result<PathBuf> {
         Self::ensure_directories()?;
 
-        let file_name = format!("report_{video_id}.md");
-        let path = PathBuf::from("reports").join(&file_name);
+        let path = Self::report_path(video_id);
 
         fs::write(&path, content).await?;
         println!("Report saved to: {}", path.display());
@@ -57,16 +77,14 @@ impl StorageService {
     }
 
     pub async fn load_transcript(video_id: &str) -> Result<String> {
-        let file_name = format!("transcript_{video_id}.txt");
-        let path = PathBuf::from("transcripts").join(&file_name);
+        let path = Self::transcript_path(video_id);
         let content = fs::read_to_string(path).await?;
         Ok(content)
     }
 
     #[allow(dead_code)]
     pub async fn load_report(video_id: &str) -> Result<String> {
-        let file_name = format!("report_{video_id}.md");
-        let path = PathBuf::from("reports").join(&file_name);
+        let path = Self::report_path(video_id);
         let content = fs::read_to_string(path).await?;
         Ok(content)
     }

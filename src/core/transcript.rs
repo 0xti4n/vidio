@@ -33,16 +33,29 @@ impl TranscriptService {
     }
 
     pub fn format_transcript(transcript: &FetchedTranscript) -> Vec<String> {
-        let mut formatted = Vec::new();
-        for snippet in transcript.snippets.iter() {
-            formatted.push(format!(
-                "[{:.1}-{:.1}s] {}",
-                snippet.start,
-                snippet.start + snippet.duration,
-                snippet.text
-            ));
-        }
-        formatted
+        transcript
+            .snippets
+            .iter()
+            .map(|snippet| {
+                let start = format_timestamp(snippet.start);
+                let end = format_timestamp(snippet.start + snippet.duration);
+                format!("[{start} - {end}] {}", snippet.text.trim())
+            })
+            .collect()
+    }
+}
+
+fn format_timestamp(seconds: f64) -> String {
+    let total_millis = (seconds * 1000.0).round() as u64;
+    let hours = total_millis / 3_600_000;
+    let minutes = (total_millis % 3_600_000) / 60_000;
+    let secs = (total_millis % 60_000) / 1_000;
+    let millis = total_millis % 1_000;
+
+    if hours > 0 {
+        format!("{hours:02}:{minutes:02}:{secs:02}.{millis:03}")
+    } else {
+        format!("{minutes:02}:{secs:02}.{millis:03}")
     }
 }
 
