@@ -1,5 +1,5 @@
 use crate::core::storage::FileEntry;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind};
 use ratatui::{
     Frame,
     layout::Rect,
@@ -65,6 +65,20 @@ impl FileList {
         }
     }
 
+    pub fn handle_mouse(&mut self, mouse: MouseEvent) -> bool {
+        match mouse.kind {
+            MouseEventKind::ScrollUp => {
+                self.scroll_up();
+                true
+            }
+            MouseEventKind::ScrollDown => {
+                self.scroll_down();
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub fn next(&mut self) {
         if self.items.is_empty() {
             return;
@@ -75,6 +89,7 @@ impl FileList {
             None => 0,
         };
         self.state.select(Some(i));
+        self.adjust_offset();
     }
 
     pub fn previous(&mut self) {
@@ -93,6 +108,7 @@ impl FileList {
             None => 0,
         };
         self.state.select(Some(i));
+        self.adjust_offset();
     }
 
     fn page_down(&mut self) {
@@ -104,6 +120,7 @@ impl FileList {
         let current = self.state.selected().unwrap_or(0);
         let new_index = (current + step).min(self.items.len() - 1);
         self.state.select(Some(new_index));
+        self.adjust_offset();
     }
 
     fn page_up(&mut self) {
@@ -115,6 +132,7 @@ impl FileList {
         let current = self.state.selected().unwrap_or(0);
         let new_index = current.saturating_sub(step);
         self.state.select(Some(new_index));
+        self.adjust_offset();
     }
 
     fn go_home(&mut self) {
@@ -122,6 +140,7 @@ impl FileList {
             return;
         }
         self.state.select(Some(0));
+        self.adjust_offset();
     }
 
     fn go_end(&mut self) {
@@ -129,6 +148,31 @@ impl FileList {
             return;
         }
         self.state.select(Some(self.items.len() - 1));
+        self.adjust_offset();
+    }
+
+    fn scroll_up(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        let current = self.state.selected().unwrap_or(0);
+        if current == 0 {
+            self.state.select(Some(0));
+        } else {
+            self.state.select(Some(current - 1));
+        }
+        self.adjust_offset();
+    }
+
+    fn scroll_down(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        let current = self.state.selected().unwrap_or(0);
+        let last = self.items.len() - 1;
+        let new_index = (current + 1).min(last);
+        self.state.select(Some(new_index));
+        self.adjust_offset();
     }
 
     pub fn toggle_selected(&mut self) {

@@ -1,5 +1,5 @@
 // Colorized markdown viewer
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind};
 use html_escape::decode_html_entities;
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use ratatui::{
@@ -35,7 +35,10 @@ impl Viewer {
     pub fn handle_key(&mut self, key: KeyEvent, area_height: u16) {
         let area_height = area_height as usize;
         let lines = self.wrapped_lines.len();
-        let page_size = area_height.saturating_sub(2);
+        let mut page_size = area_height.saturating_sub(2);
+        if page_size == 0 {
+            page_size = 1;
+        }
 
         match key.code {
             KeyCode::Up => {
@@ -81,6 +84,29 @@ impl Viewer {
             }
             KeyCode::Char('G') => {
                 self.scroll = lines.saturating_sub(page_size);
+            }
+            _ => {}
+        }
+    }
+
+    pub fn handle_mouse(&mut self, mouse: MouseEvent, area_height: u16) {
+        let area_height = area_height as usize;
+        let lines = self.wrapped_lines.len();
+        let mut page_size = area_height.saturating_sub(2);
+        if page_size == 0 {
+            page_size = 1;
+        }
+
+        match mouse.kind {
+            MouseEventKind::ScrollUp => {
+                if self.scroll > 0 {
+                    self.scroll = self.scroll.saturating_sub(1);
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if self.scroll < lines.saturating_sub(page_size) {
+                    self.scroll += 1;
+                }
             }
             _ => {}
         }

@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyEvent};
+use crossterm::event::{self, Event, KeyEvent, MouseEvent};
 use std::time::Duration;
 
 #[allow(dead_code)]
@@ -6,6 +6,7 @@ use std::time::Duration;
 pub enum AppEvent {
     Quit,
     Key(KeyEvent),
+    Mouse(MouseEvent),
     Tick,
 }
 
@@ -20,6 +21,8 @@ impl EventHandler {
         if event::poll(Duration::from_millis(100))? {
             match event::read()? {
                 Event::Key(key) => Ok(AppEvent::Key(key)),
+                Event::Mouse(mouse) => Ok(AppEvent::Mouse(mouse)),
+                Event::Resize(_, _) => Ok(AppEvent::Tick),
                 _ => Ok(AppEvent::Tick),
             }
         } else {

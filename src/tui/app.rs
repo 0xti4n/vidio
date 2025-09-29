@@ -2,7 +2,7 @@ use crate::core::{FileType, ReportService, StorageService, TranscriptService, st
 use crate::error::Result;
 use crate::tui::components::{FileList, InputField, ProgressBar, Viewer};
 use crate::tui::events::AppEvent;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::sync::mpsc;
@@ -122,6 +122,9 @@ impl App {
             AppEvent::Key(key) => {
                 self.handle_key(key)?;
             }
+            AppEvent::Mouse(mouse) => {
+                self.handle_mouse(mouse)?;
+            }
             AppEvent::Tick => {
                 // Handle any periodic updates
                 self.handle_tick()?;
@@ -139,6 +142,19 @@ impl App {
             AppState::Processing { .. } => self.handle_processing_key(key),
             AppState::Settings => self.handle_settings_key(key),
         }
+    }
+
+    fn handle_mouse(&mut self, mouse: MouseEvent) -> Result<()> {
+        match &self.state {
+            AppState::Browser { .. } => {
+                self.handle_browser_mouse(mouse);
+            }
+            AppState::Viewer { .. } => {
+                self.handle_viewer_mouse(mouse);
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     fn handle_home_key(&mut self, key: KeyEvent) -> Result<()> {
@@ -306,6 +322,23 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    fn handle_browser_mouse(&mut self, mouse: MouseEvent) {
+        if self.file_list.handle_mouse(mouse) {
+            // ensure filter state stays consistent; selection already updated inside handle_mouse
+        }
+    }
+
+    fn handle_viewer_mouse(&mut self, mouse: MouseEvent) {
+        if let Some(viewer) = &mut self.content_viewer {
+            let height = if self.viewer_height == 0 {
+                1
+            } else {
+                self.viewer_height
+            };
+            viewer.handle_mouse(mouse, height);
+        }
     }
 
     fn handle_processing_key(&mut self, key: KeyEvent) -> Result<()> {

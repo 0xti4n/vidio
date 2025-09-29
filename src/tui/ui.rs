@@ -248,7 +248,7 @@ fn draw_browser(f: &mut Frame, app: &mut App) {
 
     // Help
     let help = Paragraph::new(
-        "[1-3] Filters [Enter] Open  [Del] Delete  [Space] Select  [/] Search  [PgUp/PgDn/Home/End] Scroll",
+        "[1-3] Filters  [Enter] Open  [Del] Delete  [Space] Select  [/] Search  [PgUp/PgDn/Home/End/Wheel] Scroll",
     )
     .style(Style::default().fg(Color::Gray))
     .alignment(Alignment::Center)
@@ -270,7 +270,7 @@ fn draw_viewer(f: &mut Frame, app: &mut App) {
 
     // Help
     let help = Paragraph::new(
-        "[↑↓/j k] Scroll  [PgUp/PgDn/Space/b] Page  [Home/End/g/G] Jump  [Esc] Back",
+        "[↑↓/j k/Wheel] Scroll  [PgUp/PgDn/Space/b] Page  [Home/End/g/G] Jump  [Esc] Back",
     )
     .style(Style::default().fg(Color::Gray))
     .alignment(Alignment::Center)
