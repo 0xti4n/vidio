@@ -53,6 +53,8 @@ cargo build --release
 Set your OpenAI API key:
 ```bash
 export OPENAI_API_KEY="your-api-key-here"
+# Explicitly opt in before sending transcripts to OpenAI for report generation
+export YTRANSCRIPT_ALLOW_OPENAI=1
 ```
 
 ## Usage

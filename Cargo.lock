@@ -2825,6 +2825,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
+name = "vidio"
+version = "0.1.0"
+dependencies = [
+ "async-openai",
+ "chrono",
+ "clap",
+ "crossterm 0.29.0",
+ "derive_more 2.0.1",
+ "html-escape",
+ "pulldown-cmark",
+ "ratatui",
+ "serde",
+ "serde_json",
+ "textwrap",
+ "tokio",
+ "unicode-width 0.2.0",
+ "yt-transcript-rs",
+]
+
+[[package]]
 name = "want"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3278,26 +3298,6 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "url",
-]
-
-[[package]]
-name = "ytranscript"
-version = "0.1.0"
-dependencies = [
- "async-openai",
- "chrono",
- "clap",
- "crossterm 0.29.0",
- "derive_more 2.0.1",
- "html-escape",
- "pulldown-cmark",
- "ratatui",
- "serde",
- "serde_json",
- "textwrap",
- "tokio",
- "unicode-width 0.2.0",
- "yt-transcript-rs",
 ]
 
 [[package]]

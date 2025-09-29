@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{Error, Result};
 use async_openai::{
     self,
     types::{
@@ -10,9 +10,11 @@ use async_openai::{
     },
 };
 
+use std::env;
 use yt_transcript_rs::FetchedTranscript;
 
 const SYSTEM_PROMPT: &str = r#"Eres un ANALISTA DE CONTENIDO ULTRA-DETALLISTA"#;
+const OPENAI_OPT_IN_ENV: &str = "YTRANSCRIPT_ALLOW_OPENAI";
 
 #[derive(Clone)]
 pub struct ReportService {
@@ -33,6 +35,8 @@ impl ReportService {
     }
 
     pub async fn generate_report_text(&self, transcript_text: &str) -> Result<String> {
+        enforce_openai_opt_in()?;
+
         let request = CreateResponseArgs::default()
             .max_output_tokens(128000_u32)
             .model("gpt-5")
@@ -153,6 +157,22 @@ Analiza ahora el contenido entre las etiquetas:
         }
 
         Ok(ensure_table_headers(&content))
+    }
+}
+
+fn enforce_openai_opt_in() -> Result<()> {
+    match env::var(OPENAI_OPT_IN_ENV) {
+        Ok(val)
+            if matches!(
+                val.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            ) =>
+        {
+            Ok(())
+        }
+        _ => Err(Error::custom(format!(
+            "Report generation requires explicit opt-in. Set {OPENAI_OPT_IN_ENV}=1 to enable uploads to OpenAI."
+        ))),
     }
 }
 

@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "ytranscript")]
-#[command(about = "YouTube Transcript Downloader and Analyzer")]
+#[command(name = "vidio")]
+#[command(about = "Vidio Transcript Downloader and Analyzer")]
 #[command(version = "0.1.0")]
 pub struct Cli {
     #[command(subcommand)]

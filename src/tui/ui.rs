@@ -29,7 +29,7 @@ fn draw_home(f: &mut Frame, app: &App) {
         .split(f.area());
 
     // Title
-    let title = Paragraph::new("YTranscript TUI")
+    let title = Paragraph::new("Vidio TUI")
         .style(
             Style::default()
                 .fg(Color::Yellow)

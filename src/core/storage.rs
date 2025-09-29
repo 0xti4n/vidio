@@ -1,11 +1,18 @@
 use crate::core::transcript;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::fs as std_fs;
 use std::path::{Path, PathBuf};
 use yt_transcript_rs::FetchedTranscript;
 
 use tokio::fs;
+
+const TRANSCRIPTS_DIR: &str = "transcripts";
+const REPORTS_DIR: &str = "reports";
+const TRANSCRIPT_PREFIX: &str = "transcript_";
+const TRANSCRIPT_SUFFIX: &str = ".txt";
+const REPORT_PREFIX: &str = "report_";
+const REPORT_SUFFIX: &str = ".md";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileEntry {
@@ -26,36 +33,44 @@ pub struct StorageService;
 
 impl StorageService {
     fn ensure_directories() -> Result<()> {
-        std_fs::create_dir_all("transcripts")?;
-        std_fs::create_dir_all("reports")?;
+        ensure_directory(Path::new(TRANSCRIPTS_DIR))?;
+        ensure_directory(Path::new(REPORTS_DIR))?;
         Ok(())
     }
 
-    fn transcript_path(video_id: &str) -> PathBuf {
-        PathBuf::from("transcripts").join(format!("transcript_{video_id}.txt"))
+    fn transcript_path(video_id: &str) -> Result<PathBuf> {
+        let sanitized = transcript::sanitize_video_id(video_id)?;
+        Ok(Path::new(TRANSCRIPTS_DIR)
+            .join(format!("{TRANSCRIPT_PREFIX}{sanitized}{TRANSCRIPT_SUFFIX}")))
     }
 
-    fn report_path(video_id: &str) -> PathBuf {
-        PathBuf::from("reports").join(format!("report_{video_id}.md"))
+    fn report_path(video_id: &str) -> Result<PathBuf> {
+        let sanitized = transcript::sanitize_video_id(video_id)?;
+        Ok(Path::new(REPORTS_DIR).join(format!("{REPORT_PREFIX}{sanitized}{REPORT_SUFFIX}")))
     }
 
     pub fn transcript_exists(video_id: &str) -> bool {
         if Self::ensure_directories().is_err() {
             return false;
         }
-        Self::transcript_path(video_id).exists()
+        Self::transcript_path(video_id)
+            .map(|path| path.exists())
+            .unwrap_or(false)
     }
 
     pub fn report_exists(video_id: &str) -> bool {
         if Self::ensure_directories().is_err() {
             return false;
         }
-        Self::report_path(video_id).exists()
+        Self::report_path(video_id)
+            .map(|path| path.exists())
+            .unwrap_or(false)
     }
 
     pub async fn save_transcript(transcript: &FetchedTranscript) -> Result<PathBuf> {
         Self::ensure_directories()?;
-        let path = Self::transcript_path(&transcript.video_id);
+        let sanitized_id = transcript::sanitize_video_id(&transcript.video_id)?;
+        let path = Self::transcript_path(&sanitized_id)?;
 
         let formatted_transcript = transcript::TranscriptService::format_transcript(transcript);
         let content = formatted_transcript.join("\n");
@@ -68,7 +83,7 @@ impl StorageService {
     pub async fn save_report(video_id: &str, content: &str) -> Result<PathBuf> {
         Self::ensure_directories()?;
 
-        let path = Self::report_path(video_id);
+        let path = Self::report_path(video_id)?;
 
         fs::write(&path, content).await?;
         println!("Report saved to: {}", path.display());
@@ -77,14 +92,14 @@ impl StorageService {
     }
 
     pub async fn load_transcript(video_id: &str) -> Result<String> {
-        let path = Self::transcript_path(video_id);
+        let path = Self::transcript_path(video_id)?;
         let content = fs::read_to_string(path).await?;
         Ok(content)
     }
 
     #[allow(dead_code)]
     pub async fn load_report(video_id: &str) -> Result<String> {
-        let path = Self::report_path(video_id);
+        let path = Self::report_path(video_id)?;
         let content = fs::read_to_string(path).await?;
         Ok(content)
     }
@@ -144,6 +159,8 @@ impl StorageService {
     }
 
     pub fn delete_file(path: &Path) -> Result<()> {
+        Self::ensure_directories()?;
+        ensure_managed_path(path)?;
         std_fs::remove_file(path)?;
         Ok(())
     }
@@ -174,4 +191,48 @@ impl FileEntry {
             None
         }
     }
+}
+
+fn ensure_directory(path: &Path) -> Result<()> {
+    std_fs::create_dir_all(path)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let metadata = std_fs::metadata(path)?;
+        let mut permissions = metadata.permissions();
+        if permissions.mode() & 0o777 != 0o700 {
+            permissions.set_mode(0o700);
+            std_fs::set_permissions(path, permissions)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn ensure_managed_path(path: &Path) -> Result<()> {
+    let canonical = path
+        .canonicalize()
+        .map_err(|_| Error::custom("Target file does not exist or cannot be resolved"))?;
+
+    let transcript_base = Path::new(TRANSCRIPTS_DIR).canonicalize().ok();
+    let report_base = Path::new(REPORTS_DIR).canonicalize().ok();
+
+    let allowed = transcript_base
+        .as_ref()
+        .map(|base| canonical.starts_with(base))
+        .unwrap_or(false)
+        || report_base
+            .as_ref()
+            .map(|base| canonical.starts_with(base))
+            .unwrap_or(false);
+
+    if !allowed {
+        return Err(Error::custom(
+            "Refusing to operate on files outside managed transcript/report directories",
+        ));
+    }
+
+    Ok(())
 }

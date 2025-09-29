@@ -4,7 +4,9 @@ mod error;
 mod tui;
 
 use crate::cli::{Cli, Commands};
-use crate::core::{ReportService, StorageService, TranscriptService, extract_video_id};
+use crate::core::{
+    ReportService, StorageService, TranscriptService, extract_video_id, sanitize_video_id,
+};
 use crate::error::Result;
 use crate::tui::{App, EventHandler, init as tui_init, restore as tui_restore, ui};
 use clap::Parser;
@@ -31,7 +33,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Tui) | None => {
             if cli.cli {
-                println!("Use 'ytranscript --help' for available commands");
+                println!("Use 'vidio --help' for available commands");
             } else {
                 run_tui().await?;
             }
@@ -107,6 +109,7 @@ async fn run_cli_get(
 }
 
 async fn run_cli_report(video_id: String) -> Result<()> {
+    let video_id = sanitize_video_id(&video_id)?;
     println!("Generating report for video: {video_id}");
 
     let transcript_content = StorageService::load_transcript(&video_id).await?;
