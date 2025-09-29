@@ -107,7 +107,7 @@ Navigate through the TUI using:
 ## Project Structure
 
 ```
-ytranscript/
+vidio/
 ├── src/
 │   ├── main.rs           # Application entry point
 │   ├── cli.rs            # Command-line interface definitions
