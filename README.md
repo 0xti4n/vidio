@@ -1,4 +1,4 @@
-# YTranscript
+# Vidio
 
 A powerful YouTube transcript downloader and analyzer built in Rust, featuring both CLI and TUI interfaces with AI-powered content analysis.
 
@@ -44,8 +44,8 @@ The AI report generation provides comprehensive analysis including:
 
 ### From Source
 ```bash
-git clone https://github.com/yourusername/ytranscript.git
-cd ytranscript
+git clone git@github.com:0xti4n/vidio.git
+cd vidio
 cargo build --release
 ```
 
@@ -63,30 +63,30 @@ export YTRANSCRIPT_ALLOW_OPENAI=1
 
 #### Download a transcript
 ```bash
-ytranscript get "https://youtu.be/VIDEO_ID"
+vidio get "https://youtu.be/VIDEO_ID"
 ```
 
 #### Download with specific languages and generate report
 ```bash
-ytranscript get "https://youtu.be/VIDEO_ID" --languages "en,es" --report
+vidio get "https://youtu.be/VIDEO_ID" --languages "en,es" --report
 ```
 
 #### Generate report from existing transcript
 ```bash
-ytranscript report VIDEO_ID
+vidio report VIDEO_ID
 ```
 
 #### List all files
 ```bash
-ytranscript list
+vidio list
 ```
 
 ### TUI Mode
 Launch the interactive terminal interface:
 ```bash
-ytranscript tui
+vidio tui
 # or simply
-ytranscript
+vidio
 ```
 
 Navigate through the TUI using:
