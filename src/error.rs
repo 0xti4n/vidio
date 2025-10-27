@@ -16,7 +16,7 @@ pub enum Error {
     #[from]
     YtTranscriptCookie(CookieError),
     #[from]
-    OpenAi(OpenAIError),
+    OpenAi(Box<OpenAIError>),
 }
 
 impl Error {
@@ -27,6 +27,12 @@ impl Error {
 
     pub fn custom(val: impl Into<String>) -> Self {
         Self::Custom(val.into())
+    }
+}
+
+impl From<OpenAIError> for Error {
+    fn from(err: OpenAIError) -> Self {
+        Self::OpenAi(Box::new(err))
     }
 }
 
