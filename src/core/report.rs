@@ -1,12 +1,9 @@
 use crate::error::{Error, Result};
 use async_openai::{
     self,
-    types::{
-        ReasoningEffort,
-        responses::{
-            Content, CreateResponseArgs, Input, InputItem, InputMessageArgs, OutputContent,
-            ReasoningConfigArgs, Role,
-        },
+    types::responses::{
+        CreateResponseArgs, EasyInputMessageArgs, InputItem, InputParam, OutputItem,
+        OutputMessageContent, ReasoningArgs, ReasoningEffort, Role,
     },
 };
 
@@ -39,21 +36,21 @@ impl ReportService {
 
         let request = CreateResponseArgs::default()
             .max_output_tokens(128000_u32)
-            .model("gpt-5")
-            .reasoning(ReasoningConfigArgs::default()
+            .model("gpt-5.2")
+            .reasoning(ReasoningArgs::default()
                 .effort(ReasoningEffort::High)
                 // .summary(ReasoningSummary::Detailed)
                 .build()?
             )
-            .input(Input::Items(vec![
-                InputItem::Message(
-                    InputMessageArgs::default()
+            .input(InputParam::Items(vec![
+                InputItem::EasyMessage(
+                    EasyInputMessageArgs::default()
                         .role(Role::System)
-                        .content(SYSTEM_PROMPT.to_string())
+                        .content(SYSTEM_PROMPT)
                         .build()?,
                 ),
-                InputItem::Message(
-                    InputMessageArgs::default()
+                InputItem::EasyMessage(
+                    EasyInputMessageArgs::default()
                         .role(Role::User)
                         .content(format!(
                             "### rol
@@ -143,10 +140,10 @@ Analiza ahora el contenido entre las etiquetas:
 
         let mut content = String::new();
         for output in response.output {
-            if let OutputContent::Message(out) = output {
+            if let OutputItem::Message(out) = output {
                 for c in out.content {
                     match c {
-                        Content::OutputText(text) => content.push_str(&text.text),
+                        OutputMessageContent::OutputText(text) => content.push_str(&text.text),
                         _ => {
                             eprintln!("Unexpected content type: {c:?}");
                             continue;
